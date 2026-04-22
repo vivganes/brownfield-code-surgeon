@@ -26,7 +26,15 @@ export const VitalsSchema = z.object({
   startedAt: z.string().datetime(),
   lastUpdated: z.string().datetime(),
   currentPhase: PhaseSchema.nullable(),
-  phaseStatus: z.record(PhaseSchema, PhaseStatusSchema),
+  phaseStatus: z.object({
+    plan: PhaseStatusSchema,
+    map: PhaseStatusSchema,
+    break: PhaseStatusSchema,
+    cover: PhaseStatusSchema,
+    implement: PhaseStatusSchema,
+    refactor: PhaseStatusSchema,
+    finish: PhaseStatusSchema,
+  }),
   tests: z.object({
     total: z.number().int().nonnegative(),
     passing: z.number().int().nonnegative(),

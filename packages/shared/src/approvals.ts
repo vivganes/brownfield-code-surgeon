@@ -52,9 +52,14 @@ export async function waitForApproval(
 ): Promise<ApprovalToken> {
   const pollMs = opts.pollMs ?? 1000;
   const deadline = opts.timeoutMs ? Date.now() + opts.timeoutMs : Infinity;
+  let lastLog = Date.now();
   while (Date.now() < deadline) {
     const token = await readApproval(repoRoot, phase);
     if (token) return token;
+    if (Date.now() - lastLog >= 30_000) {
+      console.log(`[waitForApproval] still waiting for "${phase}" approval…`);
+      lastLog = Date.now();
+    }
     await new Promise((r) => setTimeout(r, pollMs));
   }
   throw new Error(`Timed out waiting for approval of phase "${phase}"`);

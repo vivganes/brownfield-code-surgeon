@@ -21,7 +21,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@brownfield-surgeon/shared": "0.1.0"
+    "@brownfield-surgeon/shared": "*"
   },
   "devDependencies": {
     "rimraf": "^6.0.1"

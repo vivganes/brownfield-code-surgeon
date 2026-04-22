@@ -4,6 +4,7 @@ import path from "node:path";
 import { SurgeryEventSchema, type SurgeryEvent, type Engine } from "./events.js";
 import { eventsFile, vitalsFile } from "./artifacts.js";
 import type { Phase } from "./phases.js";
+import { VitalsSchema, type Vitals } from "./vitals.js";
 
 export async function ensureSurgeryDir(repoRoot: string): Promise<void> {
   await fsp.mkdir(path.join(repoRoot, ".surgery"), { recursive: true });
@@ -54,17 +55,17 @@ export function makeBaseEvent(args: {
   };
 }
 
-export async function readVitals(repoRoot: string): Promise<unknown> {
+export async function readVitals(repoRoot: string): Promise<Vitals | null> {
   try {
     const contents = await fsp.readFile(vitalsFile(repoRoot), "utf8");
-    return JSON.parse(contents);
+    return VitalsSchema.parse(JSON.parse(contents));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
   }
 }
 
-export async function writeVitals(repoRoot: string, vitals: unknown): Promise<void> {
+export async function writeVitals(repoRoot: string, vitals: Vitals): Promise<void> {
   await ensureSurgeryDir(repoRoot);
   await fsp.writeFile(
     vitalsFile(repoRoot),
