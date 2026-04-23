@@ -1,14 +1,39 @@
 {
   "name": "brownfield-surgeon",
   "owner": {
-    "name": "Vivek Ganesan"
+    "name": "Vivek Ganesan",
+    "email": "caliberoviv@gmail.com"
   },
   "description": "Plugins and tooling that productionize the seven-phase brownfield code-surgery workflow.",
   "plugins": [
     {
       "name": "brownfield-code-surgeon",
       "source": "./packages/plugin",
-      "description": "Safety-first seven-phase brownfield workflow with phase-aware hooks."
+      "description": "Safety-first seven-phase brownfield workflow with phase-aware hooks.",
+      "version": "1.0.0",
+      "license": "MIT",
+      "repository": "https://github.com/vivganes/brownfield-code-surgeon",
+      "author": {
+        "name": "Vivek Ganesan"
+      },
+      "keywords": [
+        "claude-plugin",
+        "brownfield",
+        "code-surgery",
+        "refactoring",
+        "software-maintenance",
+        "seven-phase-workflow",
+        "automation",
+        "phase-hooks",
+        "safe-refactor",
+        "productionize"
+      ],
+      "tags": [
+        "workflow",
+        "refactor",
+        "brownfield",
+        "code-quality"
+      ]
     }
   ]
 }
