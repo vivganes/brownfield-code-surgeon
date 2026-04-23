@@ -1,16 +1,32 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
 import { readStdin, resolveRepoRoot, readVitals, writeVitals, appendEvent, baseEvent, PHASES, } from "./_lib.js";
-async function main() {
-    const input = await readStdin();
-    const repoRoot = resolveRepoRoot(input);
+export function defaultCommit(repoRoot, phase, runId) {
+    try {
+        execSync("git add -A", { cwd: repoRoot, stdio: "ignore" });
+        const msg = `surgery(${phase}): phase complete [${runId}]`;
+        execSync(`git commit -m ${JSON.stringify(msg)}`, {
+            cwd: repoRoot,
+            stdio: "ignore",
+        });
+    }
+    catch {
+        // Not a git repo, nothing staged, or git unavailable — silently continue.
+    }
+}
+export function run(opts = {}) {
+    const input = opts.input ?? {};
+    const env = opts.env ?? process.env;
+    const commit = opts.commit ?? defaultCommit;
+    const now = opts.now ?? Date.now;
+    const repoRoot = resolveRepoRoot(input, env);
     const vitals = readVitals(repoRoot);
     if (!vitals || !vitals.currentPhase)
-        process.exit(0);
+        return { stdout: "", exitCode: 0 };
     const phase = vitals.currentPhase;
     const startedAt = vitals.phaseStartedAt?.[phase];
     const durationMs = startedAt
-        ? Math.max(0, Date.now() - new Date(startedAt).getTime())
+        ? Math.max(0, now() - new Date(startedAt).getTime())
         : 0;
     appendEvent(repoRoot, {
         ...baseEvent(repoRoot, { phase }),
@@ -35,24 +51,20 @@ async function main() {
         artifacts: vitals.artifacts ?? [],
         summary: `Phase "${phase}" completed. Review artifacts and approve to continue.`,
     });
-    commitPhase(repoRoot, phase, updated.runId);
-    process.exit(0);
+    commit(repoRoot, phase, updated.runId);
+    return { stdout: "", exitCode: 0 };
 }
-function commitPhase(repoRoot, phase, runId) {
-    try {
-        execSync("git add -A", { cwd: repoRoot, stdio: "ignore" });
-        const msg = `surgery(${phase}): phase complete [${runId}]`;
-        execSync(`git commit -m ${JSON.stringify(msg)}`, {
-            cwd: repoRoot,
-            stdio: "ignore",
-        });
-    }
-    catch {
-        // Not a git repo, nothing staged, or git unavailable — silently continue.
-    }
+async function main() {
+    const input = await readStdin();
+    const result = run({ input });
+    if (result.stdout)
+        process.stdout.write(result.stdout);
+    process.exit(result.exitCode);
 }
-main().catch((err) => {
-    process.stderr.write(`[subagent-stop hook] ${String(err)}\n`);
-    process.exit(0);
-});
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+    main().catch((err) => {
+        process.stderr.write(`[subagent-stop hook] ${String(err)}\n`);
+        process.exit(0);
+    });
+}
 //# sourceMappingURL=subagent-stop.js.map

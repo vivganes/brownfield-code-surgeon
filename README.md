@@ -11,9 +11,9 @@ All surfaces read and write the same artifacts and emit the same events.
 | Surface | Package | Purpose | Usage Guide |
 |---|---|---|---|
 | Claude Code plugin | `packages/plugin` | Native subagents + slash commands + forbidden-moves hooks.  | Refer the plugin's [README.md](packages/plugin/README.md) |
-| SDK runner | `packages/sdk-runner` | Local Node CLI driving the pipeline via the Claude Agent SDK |  |
+| SDK runner | `packages/sdk-runner` | Local Node CLI driving the pipeline via the Claude Agent SDK | Refer the runner's [README.md](packages/sdk-runner/README.md) |
 | Managed Agents orchestrator | `packages/managed-runner` | Cloud execution for long-running phases |  |
-| Operating-theater web UI | `packages/ui` | Vitals, seams graph, phase timeline, approval controls |  |
+| Operating-theater web UI | `packages/ui` | Vitals, seams graph, phase timeline, approval controls | Refer the UI's [README.md](packages/ui/README.md) |
 
 Shared contracts live in `packages/shared`; the source-of-truth agent prompts live in `packages/core-prompts`.
 

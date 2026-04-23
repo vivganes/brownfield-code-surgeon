@@ -139,8 +139,8 @@ export function isSourcePath(filePath) {
         return false;
     return /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|cs|kt|swift)$/.test(p);
 }
-export function resolveRepoRoot(input) {
-    const fromEnv = process.env.SURGERY_REPO_ROOT;
+export function resolveRepoRoot(input, env = process.env) {
+    const fromEnv = env.SURGERY_REPO_ROOT;
     if (fromEnv)
         return fromEnv;
     if (input.cwd)

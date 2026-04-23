@@ -14,7 +14,7 @@ function extractBash(input) {
     const v = input["command"];
     return typeof v === "string" ? v : null;
 }
-function parseTestOutput(stdout) {
+export function parseTestOutput(stdout) {
     const m1 = stdout.match(/Tests?:\s+(\d+)\s+passed.*?(\d+)\s+total/i);
     if (m1 && m1[1] && m1[2]) {
         return { passed: Number(m1[1]), total: Number(m1[2]) };
@@ -33,12 +33,13 @@ function parseTestOutput(stdout) {
     }
     return null;
 }
-async function main() {
-    const input = await readStdin();
-    const repoRoot = resolveRepoRoot(input);
+export function run(opts = {}) {
+    const input = opts.input ?? {};
+    const env = opts.env ?? process.env;
+    const repoRoot = resolveRepoRoot(input, env);
     const vitals = readVitals(repoRoot);
     if (!vitals)
-        process.exit(0);
+        return { stdout: "", exitCode: 0 };
     const toolName = input.tool_name ?? "unknown";
     const toolInput = (input.tool_input ?? {});
     const toolResponse = input.tool_response;
@@ -102,10 +103,19 @@ async function main() {
             }
         }
     }
-    process.exit(0);
+    return { stdout: "", exitCode: 0 };
 }
-main().catch((err) => {
-    process.stderr.write(`[post-tool-use hook] ${String(err)}\n`);
-    process.exit(0);
-});
+async function main() {
+    const input = await readStdin();
+    const result = run({ input });
+    if (result.stdout)
+        process.stdout.write(result.stdout);
+    process.exit(result.exitCode);
+}
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+    main().catch((err) => {
+        process.stderr.write(`[post-tool-use hook] ${String(err)}\n`);
+        process.exit(0);
+    });
+}
 //# sourceMappingURL=post-tool-use.js.map

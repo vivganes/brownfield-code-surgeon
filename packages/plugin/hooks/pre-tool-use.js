@@ -14,7 +14,7 @@ function extractBashCommand(toolInput) {
     const v = toolInput["command"];
     return typeof v === "string" ? v : null;
 }
-function evaluatePhase(phase, toolName, toolInput) {
+export function evaluatePhase(phase, toolName, toolInput) {
     const filePath = extractPath(toolName, toolInput);
     const bashCmd = extractBashCommand(toolInput);
     const writing = WRITE_TOOLS.has(toolName) && filePath !== null;
@@ -85,16 +85,16 @@ function evaluatePhase(phase, toolName, toolInput) {
     }
     return { block: false };
 }
-async function main() {
-    const input = await readStdin();
-    const repoRoot = resolveRepoRoot(input);
+export function run(opts = {}) {
+    const input = opts.input ?? {};
+    const env = opts.env ?? process.env;
+    const repoRoot = resolveRepoRoot(input, env);
     const vitals = readVitals(repoRoot);
     const phase = vitals?.currentPhase ?? null;
     const toolName = input.tool_name ?? "unknown";
     const toolInput = input.tool_input ?? {};
-    if (!phase) {
-        process.exit(0);
-    }
+    if (!phase)
+        return { stdout: "", exitCode: 0 };
     const decision = evaluatePhase(phase, toolName, toolInput);
     if (decision.block) {
         appendEvent(repoRoot, {
@@ -111,13 +111,21 @@ async function main() {
                 permissionDecisionReason: decision.reason,
             },
         };
-        process.stdout.write(JSON.stringify(output));
-        process.exit(0);
+        return { stdout: JSON.stringify(output), exitCode: 0 };
     }
-    process.exit(0);
+    return { stdout: "", exitCode: 0 };
 }
-main().catch((err) => {
-    process.stderr.write(`[pre-tool-use hook] ${String(err)}\n`);
-    process.exit(0);
-});
+async function main() {
+    const input = await readStdin();
+    const result = run({ input });
+    if (result.stdout)
+        process.stdout.write(result.stdout);
+    process.exit(result.exitCode);
+}
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+    main().catch((err) => {
+        process.stderr.write(`[pre-tool-use hook] ${String(err)}\n`);
+        process.exit(0);
+    });
+}
 //# sourceMappingURL=pre-tool-use.js.map
