@@ -139,6 +139,84 @@ export function isSourcePath(filePath) {
         return false;
     return /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|cs|kt|swift)$/.test(p);
 }
+// Coverage summary scan — same shape support as shared/test-parsers.ts.
+const COVERAGE_CANDIDATES = [
+    "coverage/coverage-summary.json",
+    "coverage/coverage-final.json",
+    ".coverage/coverage-summary.json",
+];
+export function readCoverageSnapshot(repoRoot) {
+    for (const rel of COVERAGE_CANDIDATES) {
+        const abs = path.join(repoRoot, rel);
+        if (!fs.existsSync(abs))
+            continue;
+        try {
+            const json = JSON.parse(fs.readFileSync(abs, "utf8"));
+            const snap = normalizeCoverageJson(json);
+            if (snap)
+                return snap;
+        }
+        catch {
+            // try next candidate
+        }
+    }
+    return null;
+}
+function normalizeCoverageJson(json) {
+    if (!json || typeof json !== "object")
+        return null;
+    const obj = json;
+    const total = obj.total;
+    if (total && typeof total === "object") {
+        const pickPct = (k) => {
+            const v = total[k];
+            if (v && typeof v === "object") {
+                const pct = v.pct;
+                if (typeof pct === "number")
+                    return pct;
+            }
+            return undefined;
+        };
+        const statements = pickPct("statements");
+        if (typeof statements === "number") {
+            const snap = { statements };
+            const branches = pickPct("branches");
+            const functions = pickPct("functions");
+            const lines = pickPct("lines");
+            if (branches !== undefined)
+                snap.branches = branches;
+            if (functions !== undefined)
+                snap.functions = functions;
+            if (lines !== undefined)
+                snap.lines = lines;
+            return snap;
+        }
+    }
+    const files = Object.values(obj);
+    if (files.length > 0 && files[0] && typeof files[0] === "object") {
+        let sTotal = 0;
+        let sCovered = 0;
+        let rolled = false;
+        for (const f of files) {
+            const rec = f;
+            const s = rec.s;
+            if (!s)
+                continue;
+            rolled = true;
+            for (const c of Object.values(s)) {
+                sTotal += 1;
+                if (c > 0)
+                    sCovered += 1;
+            }
+        }
+        if (rolled && sTotal > 0) {
+            return {
+                statements: Math.round((sCovered / sTotal) * 1000) / 10,
+            };
+        }
+    }
+    return null;
+}
 export function resolveRepoRoot(input, env = process.env) {
     const fromEnv = env.SURGERY_REPO_ROOT;
     if (fromEnv)

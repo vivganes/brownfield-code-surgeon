@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
-import { readStdin, resolveRepoRoot, readVitals, writeVitals, appendEvent, baseEvent, classifyArtifact, } from "./_lib.js";
+import { readStdin, resolveRepoRoot, readVitals, writeVitals, appendEvent, baseEvent, classifyArtifact, readCoverageSnapshot, } from "./_lib.js";
 const WRITE_TOOLS = new Set(["Write", "Edit", "NotebookEdit", "MultiEdit"]);
 function extractPath(input) {
     for (const key of ["file_path", "filePath", "path", "notebook_path"]) {
@@ -101,9 +101,44 @@ export function run(opts = {}) {
                 };
                 writeVitals(repoRoot, updated);
             }
+            // Tests often write a coverage summary to disk. Sample + emit a delta
+            // only when the snapshot actually changed since the last observation.
+            const snap = readCoverageSnapshot(repoRoot);
+            if (snap) {
+                const fresh = readVitals(repoRoot) ?? vitals;
+                const currentKey = coverageKey(fresh.coverage.current);
+                const newKey = coverageKey(snap);
+                if (currentKey !== newKey) {
+                    const before = fresh.coverage.current ??
+                        fresh.coverage.baseline ??
+                        snap;
+                    appendEvent(repoRoot, {
+                        ...baseEvent(repoRoot),
+                        type: "CoverageDelta",
+                        before,
+                        after: snap,
+                    });
+                    const nextBaseline = fresh.coverage.baseline ?? snap;
+                    const coverageUpdate = {
+                        ...fresh,
+                        coverage: {
+                            baseline: nextBaseline,
+                            current: snap,
+                        },
+                    };
+                    writeVitals(repoRoot, coverageUpdate);
+                }
+            }
         }
     }
     return { stdout: "", exitCode: 0 };
+}
+function coverageKey(snap) {
+    if (!snap)
+        return "-";
+    return [snap.statements, snap.branches, snap.functions, snap.lines]
+        .map((v) => (typeof v === "number" ? v.toFixed(2) : "-"))
+        .join("|");
 }
 async function main() {
     const input = await readStdin();

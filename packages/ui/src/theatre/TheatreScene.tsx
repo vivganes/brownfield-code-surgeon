@@ -1,0 +1,227 @@
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Phase, SurgeryEvent, Vitals } from "../types";
+import { PHASES } from "../types";
+import { Room } from "./Room";
+import { OperatingTable } from "./OperatingTable";
+import { MudBall } from "./MudBall";
+import { MonitorWall } from "./MonitorWall";
+import { InstrumentTray } from "./InstrumentTray";
+import { useTheatreState } from "./useTheatreEvents";
+import { useEventCues } from "./audio/cues";
+import { getSoundEngine } from "./audio/SoundEngine";
+import { TheatrePhaseMonitor } from "./monitors/TheatrePhaseMonitor";
+import { TheatreLogMonitor } from "./monitors/TheatreLogMonitor";
+import { PatientStatusMonitor } from "./monitors/PatientStatusMonitor";
+import { OperatingRoomDetails } from "./OperatingRoomDetails";
+import { MonitorPopup } from "./MonitorPopup";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+
+type SceneProps = {
+  vitals: Vitals | null;
+  events: SurgeryEvent[];
+  engine: "plugin" | "sdk" | "managed";
+  onApprove: (phase: Phase) => void;
+};
+
+const INITIAL_CAMERA: [number, number, number] = [0, 1.9, 7.5];
+const INITIAL_TARGET: [number, number, number] = [0, 2.0, -3];
+
+export function TheatreScene({
+  vitals,
+  events,
+  engine,
+  onApprove,
+}: SceneProps): JSX.Element {
+  const monitorPanels = useMemo(
+    () => [
+      { title: "Protocol", node: <TheatrePhaseMonitor vitals={vitals} /> },
+      { title: "Patient Status", node: <PatientStatusMonitor vitals={vitals} events={events} /> },
+      { title: "Surgical Log", node: <TheatreLogMonitor events={events} /> },
+    ],
+    [vitals, events],
+  );
+  const state = useTheatreState(vitals, events);
+  const clickable = engine === "sdk";
+  const [audioOn, _setAudioOn] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(0.5);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const s = getSoundEngine();
+    if (audioOn) {
+      void s.start();
+      s.setMuted(muted);
+      s.setVolume(volume);
+    }
+    return () => {
+      s.stop();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    getSoundEngine().setMuted(muted);
+  }, [muted]);
+  useEffect(() => {
+    getSoundEngine().setVolume(volume);
+  }, [volume]);
+
+  useEventCues(events, audioOn);
+
+  const alarm =
+    state.lastTestFailTs > 0 && Date.now() - state.lastTestFailTs < 4000;
+
+  const lampTarget = useMemo<[number, number, number]>(() => {
+    const phase = state.activePhase;
+    if (!phase) return [0, -0.3, 0];
+    const i = PHASES.indexOf(phase);
+    if (i < 0) return [0, -0.3, 0];
+    const x = -3.0 + i * 1.0;
+    return [x, -0.3, 1.6];
+  }, [state.activePhase]);
+
+  const repoName = vitals?.repoRoot?.split(/[\\/]/).filter(Boolean).pop() ?? "repo";
+
+  const resetView = (): void => {
+    const c = controlsRef.current;
+    if (!c) return;
+    c.object.position.set(...INITIAL_CAMERA);
+    c.target.set(...INITIAL_TARGET);
+    c.update();
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Canvas
+        shadows
+        camera={{ position: INITIAL_CAMERA, fov: 58 }}
+        style={{ background: "#05070e" }}
+      >
+        <OrbitControls
+          ref={controlsRef}
+          target={INITIAL_TARGET}
+          enablePan
+          enableZoom
+          enableRotate
+          zoomSpeed={0.8}
+          panSpeed={0.8}
+          rotateSpeed={0.6}
+          screenSpacePanning
+          minDistance={2}
+          maxDistance={16}
+          minPolarAngle={Math.PI * 0.1}
+          maxPolarAngle={Math.PI * 0.62}
+          minAzimuthAngle={-Math.PI * 0.55}
+          maxAzimuthAngle={Math.PI * 0.55}
+          makeDefault
+        />
+        <Room alarm={alarm} lampTarget={lampTarget} />
+        <OperatingRoomDetails />
+        <OperatingTable />
+        <MudBall label={repoName} lastArtifactTs={state.lastArtifactTs} />
+        <MonitorWall panels={monitorPanels} onOpen={setOpenIndex} />
+        <InstrumentTray
+          glyphs={state.glyphs}
+          clickable={clickable}
+          onApprove={onApprove}
+        />
+        <fog attach="fog" args={["#05070e", 10, 30]} />
+      </Canvas>
+
+      {/* HUD */}
+      <div
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: 16,
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          background: "rgba(10,14,32,0.7)",
+          border: "1px solid #22284a",
+          borderRadius: 6,
+          padding: "6px 10px",
+          fontSize: 11,
+          fontFamily: "ui-monospace, monospace",
+          color: "#e6ecff",
+        }}
+      >
+        <span style={{ color: "#8892b8" }}>
+          role: {clickable ? "surgeon" : "observer"}
+        </span>
+        <button onClick={resetView} style={hudBtn} title="Reset camera">
+          reset view
+        </button>
+        <button onClick={() => setMuted((m) => !m)} style={hudBtn}>
+          {muted ? "unmute" : "mute"}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          style={{ width: 80 }}
+        />
+      </div>
+
+      {openIndex != null && monitorPanels[openIndex] && (
+        <MonitorPopup
+          title={monitorPanels[openIndex].title}
+          onClose={() => setOpenIndex(null)}
+        >
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              // Scale up the compact monitor content for popup reading.
+              // `zoom` is broadly supported on Chromium/WebKit and OK for this demo.
+              zoom: 1.6,
+            }}
+          >
+            {monitorPanels[openIndex].node}
+          </div>
+        </MonitorPopup>
+      )}
+
+      {/* Controls hint */}
+      <div
+        style={{
+          position: "absolute",
+          left: 16,
+          bottom: 16,
+          background: "rgba(10,14,32,0.7)",
+          border: "1px solid #22284a",
+          borderRadius: 6,
+          padding: "6px 10px",
+          fontSize: 11,
+          fontFamily: "ui-monospace, monospace",
+          color: "#8892b8",
+          lineHeight: 1.5,
+        }}
+      >
+        <div>
+          <span style={{ color: "#5eead4" }}>drag</span> rotate ·{" "}
+          <span style={{ color: "#5eead4" }}>right-drag</span> pan ·{" "}
+          <span style={{ color: "#5eead4" }}>wheel</span> zoom
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const hudBtn = {
+  background: "#1a2146",
+  color: "#e6ecff",
+  border: "1px solid #22284a",
+  borderRadius: 4,
+  fontSize: 11,
+  padding: "2px 8px",
+  cursor: "pointer",
+} as const;

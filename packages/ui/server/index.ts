@@ -198,6 +198,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         engine: payload.engine ?? "sdk",
         autoApprove: payload.autoApprove === true,
         runId: payload.runId,
+        model: typeof payload.model === "string" ? payload.model : undefined,
+        thinking:
+          payload.thinking === "off" ||
+          payload.thinking === "low" ||
+          payload.thinking === "medium" ||
+          payload.thinking === "high"
+            ? payload.thinking
+            : undefined,
       });
       json(res, 200, { ok: true, state });
     } catch (err) {

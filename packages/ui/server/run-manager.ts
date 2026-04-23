@@ -12,6 +12,8 @@ export interface StartArgs {
   engine?: EngineKind;
   autoApprove?: boolean;
   runId?: string;
+  model?: string;
+  thinking?: "off" | "low" | "medium" | "high";
 }
 
 export interface RunState {
@@ -64,8 +66,11 @@ class RunManager {
     ];
     if (args.autoApprove) cliArgs.push("--auto-approve");
     if (args.runId) cliArgs.push("--run-id", args.runId);
+    if (args.model) cliArgs.push("--model", args.model);
+    if (args.thinking) cliArgs.push("--thinking", args.thinking);
 
     this.logs = [];
+    this.appendLog(`[sdk-runner] spawn: ${process.execPath} ${cliArgs.join(" ")}`);
     const child = spawn(process.execPath, cliArgs, {
       cwd: args.repoRoot,
       env: { ...process.env },
@@ -81,8 +86,14 @@ class RunManager {
     };
     child.stdout?.on("data", (b) => this.appendLog(b.toString()));
     child.stderr?.on("data", (b) => this.appendLog(b.toString()));
-    child.on("exit", (code) => {
-      this.appendLog(`[sdk-runner] exited with code ${code}\n`);
+    child.on("error", (err) => {
+      this.appendLog(`[sdk-runner] spawn error: ${String(err)}`);
+      this.child = null;
+    });
+    child.on("exit", (code, signal) => {
+      this.appendLog(
+        `[sdk-runner] exited with code=${code} signal=${signal ?? "none"}`,
+      );
       this.child = null;
     });
     return this.state;

@@ -4,11 +4,19 @@ import {
   makeBaseEvent,
   waitForApproval,
   isApproved,
+  isTestCommand,
+  parseTestOutput,
+  readCoverageSnapshot,
+  readVitals,
+  writeVitals,
+  type CoverageSnapshot,
   type Phase,
   type SurgeryEvent,
+  type Vitals,
 } from "@brownfield-surgeon/shared";
 import { loadPrompt } from "@brownfield-surgeon/core-prompts";
 import { loadOrInitVitals, setPhaseStatus } from "./vitals-updater.js";
+import { THINKING_TOKENS, type ThinkingLevel } from "./args.js";
 
 const ENGINE = "sdk" as const;
 
@@ -18,6 +26,15 @@ export interface RunOptions {
   phases: Phase[];
   runId: string;
   autoApprove: boolean;
+  model?: string;
+  thinking?: ThinkingLevel;
+}
+
+interface PhaseContext {
+  // tool_use_id -> command executed, so we can correlate tool_result messages.
+  bashCommands: Map<string, string>;
+  // fingerprint of last seen coverage snapshot, so we don't re-emit identical deltas.
+  lastCoverageKey: string | null;
 }
 
 export async function runPipeline(opts: RunOptions): Promise<void> {
@@ -30,6 +47,8 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
 
 async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
   const startedAt = Date.now();
+  const ctx: PhaseContext = { bashCommands: new Map(), lastCoverageKey: null };
+
   await emit(opts, {
     ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
     type: "PhaseStart",
@@ -37,9 +56,16 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
   });
   await setPhaseStatus(opts.repoRoot, phase, "running");
 
+  // Baseline coverage snapshot at phase start so the first real CoverageDelta
+  // has a meaningful "before". Silently ignored if the repo doesn't produce any.
+  await samplePhaseCoverage(opts, phase, ctx, { source: "phase-start" });
+
   try {
     const prompt = buildPhasePrompt(phase, opts);
-    await streamQuery(prompt, opts, phase);
+    await streamQuery(prompt, opts, phase, ctx);
+
+    // Post-phase coverage sample — tests often write the summary after streaming ends.
+    await samplePhaseCoverage(opts, phase, ctx, { source: "phase-end" });
 
     await setPhaseStatus(opts.repoRoot, phase, "awaiting-approval");
     await emit(opts, {
@@ -50,7 +76,6 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
     });
 
     if (opts.autoApprove) {
-      // Auto-approval still writes the ok file so other tools observe the same invariant.
       const { writeApproval } = await import("@brownfield-surgeon/shared");
       await writeApproval(opts.repoRoot, phase, {
         approvedBy: "sdk-runner --auto-approve",
@@ -109,23 +134,35 @@ async function streamQuery(
   prompt: string,
   opts: RunOptions,
   phase: Phase,
+  ctx: PhaseContext,
 ): Promise<void> {
+  const thinkingTokens = opts.thinking ? THINKING_TOKENS[opts.thinking] : undefined;
   const iter = query({
     prompt,
     options: {
       cwd: opts.repoRoot,
       permissionMode: "acceptEdits",
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(typeof thinkingTokens === "number" && thinkingTokens > 0
+        ? { maxThinkingTokens: thinkingTokens }
+        : {}),
     },
   });
   for await (const message of iter as AsyncIterable<SDKMessage>) {
-    await onMessage(message, opts, phase);
+    await onMessage(message, opts, phase, ctx);
   }
 }
 
-async function onMessage(message: SDKMessage, opts: RunOptions, phase: Phase): Promise<void> {
-  // Mirror tool-use and text events onto the surgery timeline so the UI shows SDK runs
-  // with the same granularity as the plugin.
+async function onMessage(
+  message: SDKMessage,
+  opts: RunOptions,
+  phase: Phase,
+  ctx: PhaseContext,
+): Promise<void> {
   const anyMsg = message as any;
+
+  // Assistant turn — capture tool_use blocks for the ToolUse timeline and
+  // remember Bash commands so we can match them to their eventual tool_result.
   if (anyMsg.type === "assistant" && anyMsg.message?.content) {
     for (const block of anyMsg.message.content) {
       if (block.type === "tool_use") {
@@ -136,9 +173,116 @@ async function onMessage(message: SDKMessage, opts: RunOptions, phase: Phase): P
           summary: summarizeToolInput(block.name, block.input),
           blocked: false,
         });
+        if (block.name === "Bash") {
+          const cmd = (block.input as { command?: string } | undefined)
+            ?.command;
+          if (typeof cmd === "string" && block.id) {
+            ctx.bashCommands.set(block.id, cmd);
+          }
+        }
       }
     }
   }
+
+  // User turn with tool_result blocks — the SDK replays tool outputs here.
+  if (anyMsg.type === "user" && anyMsg.message?.content) {
+    for (const block of anyMsg.message.content) {
+      if (block.type !== "tool_result") continue;
+      const toolUseId: string | undefined = block.tool_use_id;
+      const cmd = toolUseId ? ctx.bashCommands.get(toolUseId) : undefined;
+      if (!cmd || !isTestCommand(cmd)) continue;
+
+      const text = extractToolResultText(block.content);
+      if (!text) continue;
+      const parsed = parseTestOutput(text);
+      if (parsed) {
+        await emitTestRun(opts, phase, parsed);
+      }
+      // Coverage is usually written to disk during the test run.
+      await samplePhaseCoverage(opts, phase, ctx, { source: "tool-result" });
+    }
+  }
+}
+
+function extractToolResultText(content: unknown): string | null {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return null;
+  const parts: string[] = [];
+  for (const c of content) {
+    if (c && typeof c === "object" && (c as { type?: string }).type === "text") {
+      const t = (c as { text?: unknown }).text;
+      if (typeof t === "string") parts.push(t);
+    }
+  }
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
+async function emitTestRun(
+  opts: RunOptions,
+  phase: Phase,
+  parsed: { passed: number; failed: number; skipped: number; total: number },
+): Promise<void> {
+  await emit(opts, {
+    ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
+    type: "TestRun",
+    passed: parsed.passed,
+    failed: parsed.failed,
+    skipped: parsed.skipped,
+    total: parsed.total,
+  });
+  const vitals = await readVitals(opts.repoRoot);
+  if (!vitals) return;
+  const updated: Vitals = {
+    ...vitals,
+    tests: {
+      total: parsed.total,
+      passing: parsed.passed,
+      failing: parsed.failed,
+      skipped: parsed.skipped,
+    },
+  };
+  await writeVitals(opts.repoRoot, updated);
+}
+
+async function samplePhaseCoverage(
+  opts: RunOptions,
+  phase: Phase,
+  ctx: PhaseContext,
+  { source }: { source: string },
+): Promise<void> {
+  const snap = readCoverageSnapshot(opts.repoRoot);
+  if (!snap) return;
+  const key = coverageKey(snap);
+  if (key === ctx.lastCoverageKey) return;
+  ctx.lastCoverageKey = key;
+
+  const vitals = await readVitals(opts.repoRoot);
+  if (!vitals) return;
+
+  const before = vitals.coverage.current ?? vitals.coverage.baseline ?? snap;
+  await emit(opts, {
+    ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
+    type: "CoverageDelta",
+    before,
+    after: snap,
+  });
+
+  const nextBaseline = vitals.coverage.baseline ?? snap;
+  const updated: Vitals = {
+    ...vitals,
+    coverage: {
+      baseline: nextBaseline,
+      current: snap,
+    },
+  };
+  await writeVitals(opts.repoRoot, updated);
+  void source; // reserved for future debug logs
+}
+
+function coverageKey(s: CoverageSnapshot): string {
+  return [s.statements, s.branches, s.functions, s.lines]
+    .map((v) => (typeof v === "number" ? v.toFixed(2) : "-"))
+    .join("|");
 }
 
 function summarizeToolInput(tool: string, input: unknown): string | undefined {
