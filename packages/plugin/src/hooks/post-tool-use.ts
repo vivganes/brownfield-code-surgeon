@@ -9,6 +9,7 @@ import {
   baseEvent,
   classifyArtifact,
   type Vitals,
+  type HookInput,
 } from "./_lib.js";
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "NotebookEdit", "MultiEdit"]);
@@ -26,7 +27,7 @@ function extractBash(input: Record<string, unknown>): string | null {
   return typeof v === "string" ? v : null;
 }
 
-function parseTestOutput(stdout: string): {
+export function parseTestOutput(stdout: string): {
   passed?: number;
   failed?: number;
   total?: number;
@@ -52,11 +53,22 @@ function parseTestOutput(stdout: string): {
   return null;
 }
 
-async function main() {
-  const input = await readStdin();
-  const repoRoot = resolveRepoRoot(input);
+export interface RunOptions {
+  input?: HookInput;
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface RunResult {
+  stdout: string;
+  exitCode: number;
+}
+
+export function run(opts: RunOptions = {}): RunResult {
+  const input = opts.input ?? {};
+  const env = opts.env ?? process.env;
+  const repoRoot = resolveRepoRoot(input, env);
   const vitals = readVitals(repoRoot);
-  if (!vitals) process.exit(0);
+  if (!vitals) return { stdout: "", exitCode: 0 };
 
   const toolName = input.tool_name ?? "unknown";
   const toolInput = (input.tool_input ?? {}) as Record<string, unknown>;
@@ -129,10 +141,19 @@ async function main() {
     }
   }
 
-  process.exit(0);
+  return { stdout: "", exitCode: 0 };
 }
 
-main().catch((err) => {
-  process.stderr.write(`[post-tool-use hook] ${String(err)}\n`);
-  process.exit(0);
-});
+async function main() {
+  const input = await readStdin();
+  const result = run({ input });
+  if (result.stdout) process.stdout.write(result.stdout);
+  process.exit(result.exitCode);
+}
+
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+  main().catch((err) => {
+    process.stderr.write(`[post-tool-use hook] ${String(err)}\n`);
+    process.exit(0);
+  });
+}

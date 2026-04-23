@@ -8,6 +8,7 @@ import {
   isSourcePath,
   isTestPath,
   type Phase,
+  type HookInput,
 } from "./_lib.js";
 
 interface Decision {
@@ -31,7 +32,7 @@ function extractBashCommand(toolInput: Record<string, unknown>): string | null {
   return typeof v === "string" ? v : null;
 }
 
-function evaluatePhase(
+export function evaluatePhase(
   phase: Phase,
   toolName: string,
   toolInput: Record<string, unknown>,
@@ -125,17 +126,26 @@ function evaluatePhase(
   return { block: false };
 }
 
-async function main() {
-  const input = await readStdin();
-  const repoRoot = resolveRepoRoot(input);
+export interface RunOptions {
+  input?: HookInput;
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface RunResult {
+  stdout: string;
+  exitCode: number;
+}
+
+export function run(opts: RunOptions = {}): RunResult {
+  const input = opts.input ?? {};
+  const env = opts.env ?? process.env;
+  const repoRoot = resolveRepoRoot(input, env);
   const vitals = readVitals(repoRoot);
   const phase = vitals?.currentPhase ?? null;
   const toolName = input.tool_name ?? "unknown";
   const toolInput = input.tool_input ?? {};
 
-  if (!phase) {
-    process.exit(0);
-  }
+  if (!phase) return { stdout: "", exitCode: 0 };
 
   const decision = evaluatePhase(phase, toolName, toolInput);
 
@@ -154,14 +164,22 @@ async function main() {
         permissionDecisionReason: decision.reason,
       },
     };
-    process.stdout.write(JSON.stringify(output));
-    process.exit(0);
+    return { stdout: JSON.stringify(output), exitCode: 0 };
   }
 
-  process.exit(0);
+  return { stdout: "", exitCode: 0 };
 }
 
-main().catch((err) => {
-  process.stderr.write(`[pre-tool-use hook] ${String(err)}\n`);
-  process.exit(0);
-});
+async function main() {
+  const input = await readStdin();
+  const result = run({ input });
+  if (result.stdout) process.stdout.write(result.stdout);
+  process.exit(result.exitCode);
+}
+
+if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+  main().catch((err) => {
+    process.stderr.write(`[pre-tool-use hook] ${String(err)}\n`);
+    process.exit(0);
+  });
+}

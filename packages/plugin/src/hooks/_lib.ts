@@ -192,8 +192,11 @@ export function isSourcePath(filePath: string): boolean {
   return /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|cs|kt|swift)$/.test(p);
 }
 
-export function resolveRepoRoot(input: HookInput): string {
-  const fromEnv = process.env.SURGERY_REPO_ROOT;
+export function resolveRepoRoot(
+  input: HookInput,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const fromEnv = env.SURGERY_REPO_ROOT;
   if (fromEnv) return fromEnv;
   if (input.cwd) return findRepoRoot(input.cwd);
   return findRepoRoot(process.cwd());
