@@ -1,0 +1,14 @@
+{
+  "name": "brownfield-surgeon",
+  "owner": {
+    "name": "Vivek Ganesan"
+  },
+  "description": "Plugins and tooling that productionize the seven-phase brownfield code-surgery workflow.",
+  "plugins": [
+    {
+      "name": "brownfield-code-surgeon",
+      "source": "./packages/plugin",
+      "description": "Safety-first seven-phase brownfield workflow with phase-aware hooks."
+    }
+  ]
+}

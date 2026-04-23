@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @brownfield-surgeon/shared && npm run build -w @brownfield-surgeon/core-prompts",
+    "build": "npm run build -w @brownfield-surgeon/shared && npm run build -w @brownfield-surgeon/core-prompts && npm run build -w @brownfield-surgeon/plugin",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
