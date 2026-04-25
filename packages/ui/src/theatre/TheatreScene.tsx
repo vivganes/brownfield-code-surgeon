@@ -44,9 +44,6 @@ export function TheatreScene({
   );
   const state = useTheatreState(vitals, events);
   const clickable = engine === "sdk";
-  const pendingApprovals = PHASES.filter(
-    (p) => state.glyphs[p] === "awaiting-approval",
-  );
   const [dismissedBlockedTs, setDismissedBlockedTs] = useState(0);
   const visibleBlockedTools = state.blockedTools.filter(
     (b) => b.timestamp > dismissedBlockedTs,
@@ -229,52 +226,6 @@ export function TheatreScene({
         </MonitorPopup>
       )}
 
-      {/* Approval popup */}
-      {pendingApprovals.length > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            zIndex: 30,
-            background: "rgba(10,14,32,0.95)",
-            border: "1px solid #5eead4",
-            borderRadius: 8,
-            padding: "20px 28px",
-            fontFamily: "ui-monospace, monospace",
-            color: "#e6ecff",
-            textAlign: "center",
-            minWidth: 260,
-          }}
-        >
-          <div style={{ color: "#5eead4", fontSize: 11, letterSpacing: "0.1em", marginBottom: 8 }}>
-            ⏸ AWAITING APPROVAL
-          </div>
-          {pendingApprovals.map((phase) => (
-            <div key={phase} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>
-                phase <span style={{ color: "#ffd27a" }}>{phase}</span> complete
-              </div>
-              <button
-                onClick={() => onApprove(phase)}
-                style={{
-                  background: "#0f3d35",
-                  color: "#5eead4",
-                  border: "1px solid #5eead4",
-                  borderRadius: 4,
-                  padding: "5px 18px",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                approve → proceed
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Blocked tools popup */}
       {visibleBlockedTools.length > 0 && (
