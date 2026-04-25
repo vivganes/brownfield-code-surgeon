@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RunOptions } from "./runner.js";
+import type { Phase } from "@brownfield-surgeon/shared";
+import { buildPhasePrompt } from "./runner.js";
 
 describe("runner", () => {
   beforeEach(() => {
@@ -174,16 +176,72 @@ describe("runner", () => {
 
   describe("Prompt building", () => {
     it("phase prompt includes context", () => {
-      // Based on buildPhasePrompt logic
-      const contextFields = [
-        "Repo root",
-        "Run id",
-        "Engine",
-        "User request",
-      ];
+      const opts: RunOptions = {
+        repoRoot: "/repo",
+        request: "add feature",
+        phases: ["plan"],
+        runId: "run-123",
+        autoApprove: false,
+      };
 
-      expect(contextFields).toHaveLength(4);
-      expect(contextFields.includes("Repo root")).toBe(true);
+      const prompt = buildPhasePrompt("plan", opts);
+      expect(prompt).toContain("Repo root: /repo");
+      expect(prompt).toContain("Run id: run-123");
+      expect(prompt).toContain("Engine: sdk-runner");
+      expect(prompt).toContain("User request: add feature");
+    });
+
+    it("plan phase includes plan.md artifact instruction", () => {
+      const opts: RunOptions = {
+        repoRoot: "/repo",
+        request: "add feature",
+        phases: ["plan"],
+        runId: "run-123",
+        autoApprove: false,
+      };
+
+      const prompt = buildPhasePrompt("plan", opts);
+      expect(prompt).toContain("Produce `plan/plan.md`");
+      expect(prompt).toContain("feature description");
+      expect(prompt).toContain("change points");
+      expect(prompt).toContain("impact analysis");
+      expect(prompt).toContain("risk assessment");
+      expect(prompt).toContain("success criteria");
+    });
+
+    it("map phase includes seams-and-dependencies.md artifact instruction", () => {
+      const opts: RunOptions = {
+        repoRoot: "/repo",
+        request: "add feature",
+        phases: ["map"],
+        runId: "run-123",
+        autoApprove: false,
+      };
+
+      const prompt = buildPhasePrompt("map", opts);
+      expect(prompt).toContain("Produce `plan/seams-and-dependencies.md`");
+      expect(prompt).toContain("classes to test");
+      expect(prompt).toContain("seams identified");
+      expect(prompt).toContain("dependency graph");
+      expect(prompt).toContain("testing obstacles");
+      expect(prompt).toContain("testing strategy");
+    });
+
+    it("other phases do not include artifact output instructions", () => {
+      const otherPhases: Phase[] = ["break", "cover", "implement", "refactor", "finish"];
+      const opts: RunOptions = {
+        repoRoot: "/repo",
+        request: "add feature",
+        phases: otherPhases,
+        runId: "run-123",
+        autoApprove: false,
+      };
+
+      for (const phase of otherPhases) {
+        const prompt = buildPhasePrompt(phase, opts);
+        expect(prompt).not.toContain("Produce `plan/plan.md`");
+        expect(prompt).not.toContain("Produce `plan/seams-and-dependencies.md`");
+      }
     });
   });
 

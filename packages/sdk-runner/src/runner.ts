@@ -183,9 +183,9 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
   }
 }
 
-function buildPhasePrompt(phase: Phase, opts: RunOptions): string {
+export function buildPhasePrompt(phase: Phase, opts: RunOptions): string {
   const { body } = loadPrompt(phase);
-  return [
+  const lines = [
     body,
     "",
     "---",
@@ -196,9 +196,15 @@ function buildPhasePrompt(phase: Phase, opts: RunOptions): string {
     `- Engine: sdk-runner`,
     `- User request: ${opts.request}`,
     "",
-    "Produce the phase's prescribed artifacts at the contract paths",
-    "(`plan/plan.md`, `plan/seams-and-dependencies.md`, etc.) and exit when done.",
-  ].join("\n");
+  ];
+
+  if (phase === "plan") {
+    lines.push("Produce `plan/plan.md` with the feature description, change points, impact analysis, risk assessment, and success criteria.");
+  } else if (phase === "map") {
+    lines.push("Produce `plan/seams-and-dependencies.md` with classes to test, seams identified, dependency graph, testing obstacles, and testing strategy.");
+  }
+
+  return lines.join("\n");
 }
 
 async function streamQuery(
