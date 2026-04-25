@@ -4,7 +4,18 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export type EngineKind = "sdk" | "plugin";
+export type EngineKind = "sdk" | "plugin" | "managed";
+
+export interface ManagedFinishArgs {
+  /** Optional repo URL; managed-runner derives from `git remote origin` if absent. */
+  repoUrl?: string;
+  /** Optional base branch; managed-runner derives from `origin/HEAD` if absent. */
+  baseBranch?: string;
+  /** Optional scratch branch override; defaults to `surgery/<runId>/finish`. */
+  scratchBranch?: string;
+  /** Anthropic Managed-Agents environment ID (required when engine="managed"). */
+  agentEnvId?: string;
+}
 
 export interface StartArgs {
   repoRoot: string;
@@ -14,6 +25,8 @@ export interface StartArgs {
   runId?: string;
   model?: string;
   thinking?: "off" | "low" | "medium" | "high";
+  /** Only consulted when engine === "managed". */
+  managed?: ManagedFinishArgs;
 }
 
 export interface RunState {
@@ -22,6 +35,12 @@ export interface RunState {
   startedAt: string;
   request: string;
   runId: string | null;
+}
+
+interface SpawnPlan {
+  cliPath: string;
+  cliArgs: string[];
+  logPrefix: string;
 }
 
 class RunManager {
@@ -46,32 +65,24 @@ class RunManager {
       throw new Error("a run is already in progress");
     }
     const engine: EngineKind = args.engine ?? "sdk";
-    if (engine !== "sdk") {
-      throw new Error("only the sdk engine can be spawned from the UI backend");
+    if (engine === "plugin") {
+      // Plugin runs inside Claude Code itself, driven by slash commands. The
+      // backend does not spawn it.
+      throw new Error(
+        "the plugin engine is user-driven; trigger /surgery from Claude Code instead",
+      );
     }
-    const cliPath = path.resolve(
-      __dirname,
-      "..",
-      "..",
-      "sdk-runner",
-      "dist",
-      "cli.js",
-    );
-    const cliArgs = [
-      cliPath,
-      "--repo",
-      args.repoRoot,
-      "--request",
-      args.request,
-    ];
-    if (args.autoApprove) cliArgs.push("--auto-approve");
-    if (args.runId) cliArgs.push("--run-id", args.runId);
-    if (args.model) cliArgs.push("--model", args.model);
-    if (args.thinking) cliArgs.push("--thinking", args.thinking);
+
+    const plan =
+      engine === "managed"
+        ? planManagedRunner(args)
+        : planSdkRunner(args);
 
     this.logs = [];
-    this.appendLog(`[sdk-runner] spawn: ${process.execPath} ${cliArgs.join(" ")}`);
-    const child = spawn(process.execPath, cliArgs, {
+    this.appendLog(
+      `[${plan.logPrefix}] spawn: ${process.execPath} ${plan.cliArgs.join(" ")}`,
+    );
+    const child = spawn(process.execPath, plan.cliArgs, {
       cwd: args.repoRoot,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
@@ -87,12 +98,12 @@ class RunManager {
     child.stdout?.on("data", (b) => this.appendLog(b.toString()));
     child.stderr?.on("data", (b) => this.appendLog(b.toString()));
     child.on("error", (err) => {
-      this.appendLog(`[sdk-runner] spawn error: ${String(err)}`);
+      this.appendLog(`[${plan.logPrefix}] spawn error: ${String(err)}`);
       this.child = null;
     });
     child.on("exit", (code, signal) => {
       this.appendLog(
-        `[sdk-runner] exited with code=${code} signal=${signal ?? "none"}`,
+        `[${plan.logPrefix}] exited with code=${code} signal=${signal ?? "none"}`,
       );
       this.child = null;
     });
@@ -115,4 +126,51 @@ class RunManager {
   }
 }
 
+function planSdkRunner(args: StartArgs): SpawnPlan {
+  const cliPath = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "sdk-runner",
+    "dist",
+    "cli.js",
+  );
+  const cliArgs = [
+    cliPath,
+    "--repo",
+    args.repoRoot,
+    "--request",
+    args.request,
+  ];
+  if (args.autoApprove) cliArgs.push("--auto-approve");
+  if (args.runId) cliArgs.push("--run-id", args.runId);
+  if (args.model) cliArgs.push("--model", args.model);
+  if (args.thinking) cliArgs.push("--thinking", args.thinking);
+  return { cliPath, cliArgs, logPrefix: "sdk-runner" };
+}
+
+function planManagedRunner(args: StartArgs): SpawnPlan {
+  const cliPath = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "managed-runner",
+    "dist",
+    "cli.js",
+  );
+  const cliArgs = [cliPath, "--repo", args.repoRoot];
+  if (args.runId) cliArgs.push("--run-id", args.runId);
+  if (args.request) cliArgs.push("--request", args.request);
+  if (args.model) cliArgs.push("--model", args.model);
+  const m = args.managed;
+  if (m?.repoUrl) cliArgs.push("--repo-url", m.repoUrl);
+  if (m?.baseBranch) cliArgs.push("--base-branch", m.baseBranch);
+  if (m?.scratchBranch) cliArgs.push("--scratch-branch", m.scratchBranch);
+  if (m?.agentEnvId) cliArgs.push("--agent-env-id", m.agentEnvId);
+  return { cliPath, cliArgs, logPrefix: "managed-runner" };
+}
+
 export const runManager = new RunManager();
+
+// Exported for tests.
+export const __testing = { planSdkRunner, planManagedRunner };

@@ -20,6 +20,8 @@
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.0",
+    "@brownfield-surgeon/managed-runner": "*",
     "@brownfield-surgeon/shared": "*",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",

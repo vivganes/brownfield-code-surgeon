@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SettingsModal, type SettingsState } from "./SettingsModal.js";
 
 type RunStatus = {
   running: boolean;
@@ -24,6 +25,8 @@ const THINKING_LEVELS: Array<{ id: ThinkingLevel; label: string; tag: string }> 
 export function RunControls(): JSX.Element {
   const [status, setStatus] = useState<RunStatus>({ running: false, state: null });
   const [modalOpen, setModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<SettingsState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,6 +41,17 @@ export function RunControls(): JSX.Element {
     void poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) setSettings(await res.json());
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   const abort = async () => {
@@ -59,31 +73,63 @@ export function RunControls(): JSX.Element {
           <button onClick={abort}>Abort</button>
         </>
       ) : (
-        <button
-          onClick={() => setModalOpen(true)}
-          style={{
-            background: "var(--accent)",
-            color: "#07142c",
-            border: "none",
-            borderRadius: 4,
-            padding: "5px 14px",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-          }}
-        >
-          + New Surgery
-        </button>
+        <>
+          <button
+            onClick={() => setModalOpen(true)}
+            style={{
+              background: "var(--accent)",
+              color: "#07142c",
+              border: "none",
+              borderRadius: 4,
+              padding: "5px 14px",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            + New Surgery
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+            aria-label="Settings"
+            style={{
+              background: "transparent",
+              border: "1px solid #22284a",
+              color: "var(--muted)",
+              borderRadius: 4,
+              padding: "4px 8px",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            ⚙
+          </button>
+        </>
       )}
       {error && <span style={{ fontSize: 11, color: "var(--err)" }}>{error}</span>}
       {modalOpen && (
         <NewSurgeryModal
+          settings={settings}
+          onOpenSettings={() => {
+            setModalOpen(false);
+            setSettingsOpen(true);
+          }}
           onClose={() => setModalOpen(false)}
           onStarted={(state) => {
             setStatus({ running: true, state });
             setModalOpen(false);
+          }}
+        />
+      )}
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(s) => {
+            setSettings(s);
+            setSettingsOpen(false);
           }}
         />
       )}
@@ -92,9 +138,13 @@ export function RunControls(): JSX.Element {
 }
 
 function NewSurgeryModal({
+  settings,
+  onOpenSettings,
   onClose,
   onStarted,
 }: {
+  settings: SettingsState | null;
+  onOpenSettings: () => void;
   onClose: () => void;
   onStarted: (state: RunStatus["state"]) => void;
 }): JSX.Element {
@@ -103,6 +153,9 @@ function NewSurgeryModal({
   const [model, setModel] = useState(MODELS[0]!.id);
   const [thinking, setThinking] = useState<ThinkingLevel>("medium");
   const [autoApprove, setAutoApprove] = useState(false);
+  const [managedFinish, setManagedFinish] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [baseBranch, setBaseBranch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,25 +179,54 @@ function NewSurgeryModal({
         // ignore
       }
     })();
+    void (async () => {
+      try {
+        const res = await fetch("/api/repo/origin");
+        if (res.ok) {
+          const j = await res.json();
+          if (typeof j.repoUrl === "string") setRepoUrl(j.repoUrl);
+          if (typeof j.baseBranch === "string") setBaseBranch(j.baseBranch);
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
+  const managedReady =
+    !managedFinish ||
+    (Boolean(settings?.githubTokenSet) && Boolean(settings?.agentEnvId));
   const start = async () => {
     const trimmed = request.trim();
     if (!trimmed || submitting) return;
+    if (!managedReady) {
+      setError(
+        "Managed Finish needs a GitHub token and a Managed-Agents environment. Click ⚙ to configure.",
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
+      const payload: Record<string, unknown> = {
+        request: trimmed,
+        engine: managedFinish ? "managed" : "sdk",
+        model,
+        thinking,
+        autoApprove,
+        workspace: workspace.trim() || undefined,
+      };
+      if (managedFinish) {
+        payload.managed = {
+          repoUrl: repoUrl.trim() || undefined,
+          baseBranch: baseBranch.trim() || undefined,
+          agentEnvId: settings?.agentEnvId ?? undefined,
+        };
+      }
       const res = await fetch("/api/run/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          request: trimmed,
-          engine: "sdk",
-          model,
-          thinking,
-          autoApprove,
-          workspace: workspace.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -289,11 +371,115 @@ function NewSurgeryModal({
           >
             <input
               type="checkbox"
+              aria-label="auto-approve each phase"
               checked={autoApprove}
               onChange={(e) => setAutoApprove(e.target.checked)}
             />
             auto-approve each phase (skip the hand-off gates)
           </label>
+
+          <div
+            style={{
+              borderTop: "1px solid #1a1f3a",
+              paddingTop: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: "var(--muted)",
+              }}
+            >
+              <input
+                type="checkbox"
+                aria-label="run finish on managed runner"
+                checked={managedFinish}
+                onChange={(e) => setManagedFinish(e.target.checked)}
+              />
+              <span>
+                Run on Managed Agents (cloud)
+                <span style={{ display: "block", fontSize: 11, opacity: 0.7 }}>
+                  Spawns the run inside an Anthropic Managed-Agents environment instead of the local SDK runner.
+                </span>
+              </span>
+            </label>
+
+            {managedFinish && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  padding: "10px 12px",
+                  background: "rgba(94,234,212,0.04)",
+                  border: "1px solid rgba(94,234,212,0.2)",
+                  borderRadius: 4,
+                }}
+              >
+                <label style={label}>
+                  <span>Repo URL</span>
+                  <input
+                    type="text"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    placeholder="https://github.com/owner/repo.git"
+                    spellCheck={false}
+                    style={input}
+                  />
+                </label>
+                <label style={label}>
+                  <span>Base branch</span>
+                  <input
+                    type="text"
+                    value={baseBranch}
+                    onChange={(e) => setBaseBranch(e.target.value)}
+                    placeholder="main"
+                    spellCheck={false}
+                    style={input}
+                  />
+                </label>
+                {!managedReady && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--err)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      Missing{" "}
+                      {!settings?.githubTokenSet && "GitHub token"}
+                      {!settings?.githubTokenSet && !settings?.agentEnvId && " and "}
+                      {!settings?.agentEnvId && "Managed-Agents environment"}.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      style={{
+                        background: "var(--panel-2)",
+                        color: "var(--accent)",
+                        border: "1px solid #22284a",
+                        borderRadius: 4,
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Configure ⚙
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {error && (
             <div
@@ -325,14 +511,22 @@ function NewSurgeryModal({
           </button>
           <button
             onClick={start}
-            disabled={submitting || !request.trim()}
+            disabled={submitting || !request.trim() || !managedReady}
             style={{
               ...primaryBtn,
-              opacity: submitting || !request.trim() ? 0.5 : 1,
-              cursor: submitting || !request.trim() ? "not-allowed" : "pointer",
+              opacity:
+                submitting || !request.trim() || !managedReady ? 0.5 : 1,
+              cursor:
+                submitting || !request.trim() || !managedReady
+                  ? "not-allowed"
+                  : "pointer",
             }}
           >
-            {submitting ? "starting…" : "Start Surgery using Claude SDK"}
+            {submitting
+              ? "starting…"
+              : managedFinish
+                ? "Start Surgery on Managed Agents"
+                : "Start Surgery using Claude SDK"}
           </button>
         </div>
       </div>

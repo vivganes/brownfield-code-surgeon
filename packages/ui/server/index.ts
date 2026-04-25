@@ -19,6 +19,13 @@ import {
 } from "@brownfield-surgeon/shared";
 import { watchEventsFile } from "./tail.js";
 import { runManager } from "./run-manager.js";
+import {
+  readSecrets,
+  writeSecrets,
+  resolveRepoUrl,
+  resolveBaseBranch,
+} from "@brownfield-surgeon/managed-runner";
+import Anthropic from "@anthropic-ai/sdk";
 
 const PORT = Number(process.env.SURGERY_UI_PORT ?? 7777);
 const REPO_ROOT = path.resolve(process.env.SURGERY_REPO_ROOT ?? process.cwd());
@@ -201,6 +208,69 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
     return;
   }
+  if (pathname === "/api/repo/origin" && req.method === "GET") {
+    const repoUrl = resolveRepoUrl(REPO_ROOT) ?? null;
+    const baseBranch = resolveBaseBranch(REPO_ROOT);
+    json(res, 200, { repoUrl, baseBranch });
+    return;
+  }
+  if (pathname === "/api/settings" && req.method === "GET") {
+    const s = readSecrets();
+    // Don't echo secret values to the browser. Surface only "is set" for the
+    // token; the env id is non-secret (it's a public Anthropic resource ID)
+    // so we send it back so the dropdown can pre-select.
+    json(res, 200, {
+      githubTokenSet: Boolean(s.githubToken),
+      agentEnvId: s.agentEnvId ?? null,
+    });
+    return;
+  }
+  if (pathname === "/api/settings" && req.method === "PUT") {
+    const body = await readBody(req).catch(() => "");
+    let payload: any = {};
+    try { payload = body ? JSON.parse(body) : {}; } catch { payload = {}; }
+    const patch: { githubToken?: string; agentEnvId?: string } = {};
+    if (typeof payload.githubToken === "string" && payload.githubToken.length > 0) {
+      patch.githubToken = payload.githubToken;
+    }
+    if (typeof payload.agentEnvId === "string" && payload.agentEnvId.length > 0) {
+      patch.agentEnvId = payload.agentEnvId;
+    }
+    try {
+      writeSecrets(patch);
+      const s = readSecrets();
+      json(res, 200, {
+        ok: true,
+        githubTokenSet: Boolean(s.githubToken),
+        agentEnvId: s.agentEnvId ?? null,
+      });
+    } catch (err) {
+      json(res, 500, { error: String(err) });
+    }
+    return;
+  }
+  if (pathname === "/api/managed/environments" && req.method === "GET") {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      json(res, 503, {
+        error:
+          "ANTHROPIC_API_KEY not set in the server environment; cannot list environments",
+      });
+      return;
+    }
+    try {
+      const client = new Anthropic();
+      const envs: Array<{ id: string; name: string }> = [];
+      for await (const e of client.beta.environments.list()) {
+        // Filter out archived envs — they cannot accept new sessions.
+        if (e.archived_at) continue;
+        envs.push({ id: e.id, name: e.name });
+      }
+      json(res, 200, { environments: envs });
+    } catch (err) {
+      json(res, 502, { error: String(err) });
+    }
+    return;
+  }
   if (pathname === "/api/run/start" && req.method === "POST") {
     const body = await readBody(req).catch(() => "");
     let payload: any = {};
@@ -215,10 +285,37 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         typeof payload.workspace === "string" && payload.workspace.trim()
           ? path.resolve(payload.workspace.trim())
           : REPO_ROOT;
+      const engine =
+        payload.engine === "plugin" ||
+        payload.engine === "managed" ||
+        payload.engine === "sdk"
+          ? payload.engine
+          : "sdk";
+      const managed =
+        engine === "managed" && payload.managed && typeof payload.managed === "object"
+          ? {
+              repoUrl:
+                typeof payload.managed.repoUrl === "string"
+                  ? payload.managed.repoUrl
+                  : undefined,
+              baseBranch:
+                typeof payload.managed.baseBranch === "string"
+                  ? payload.managed.baseBranch
+                  : undefined,
+              scratchBranch:
+                typeof payload.managed.scratchBranch === "string"
+                  ? payload.managed.scratchBranch
+                  : undefined,
+              agentEnvId:
+                typeof payload.managed.agentEnvId === "string"
+                  ? payload.managed.agentEnvId
+                  : undefined,
+            }
+          : undefined;
       const state = runManager.start({
         repoRoot: workspace,
         request,
-        engine: payload.engine ?? "sdk",
+        engine,
         autoApprove: payload.autoApprove === true,
         runId: payload.runId,
         model: typeof payload.model === "string" ? payload.model : undefined,
@@ -229,6 +326,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           payload.thinking === "high"
             ? payload.thinking
             : undefined,
+        managed,
       });
       json(res, 200, { ok: true, state });
     } catch (err) {
