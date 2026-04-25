@@ -1,6 +1,18 @@
 #!/usr/bin/env node
 import { parseArgs, HELP } from "./args.js";
-import { runPipeline } from "./runner.js";
+import { runPipeline, markActivePhaseFailedSync } from "./runner.js";
+
+process.on("uncaughtException", (err) => {
+  markActivePhaseFailedSync(`uncaughtException: ${err?.message ?? err}`);
+  console.error("[sdk-runner] uncaughtException:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  markActivePhaseFailedSync(`unhandledRejection: ${String(reason)}`);
+  console.error("[sdk-runner] unhandledRejection:", reason);
+  process.exit(1);
+});
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -21,6 +33,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  markActivePhaseFailedSync(`main rejection: ${err?.message ?? err}`);
   console.error("[sdk-runner] fatal:", err);
   process.exit(1);
 });

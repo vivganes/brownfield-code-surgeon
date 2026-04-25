@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { emptyVitals } from "@brownfield-surgeon/shared";
 
 // Mock the Claude Agent SDK so we never make real network calls.
@@ -580,5 +580,243 @@ describe("runPipeline — message handling", () => {
     const coverageEvents = events.filter((e) => e.type === "CoverageDelta");
     // First sample emits one. Second sample with identical fingerprint is deduped.
     expect(coverageEvents.length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("hardening: SDK error result handling", () => {
+  let mockQuery: any;
+  let mockShared: any;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const sdk = await import("@anthropic-ai/claude-agent-sdk");
+    mockQuery = vi.mocked(sdk.query);
+    mockShared = await import("@brownfield-surgeon/shared");
+    vi.mocked(mockShared.readVitals).mockResolvedValue(
+      emptyVitals({ runId: "run-1", repoRoot: "/repo", engine: "sdk" }),
+    );
+  });
+
+  it("throws and marks phase failed when SDK yields a result with error_* subtype", async () => {
+    mockQuery.mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: "result",
+          subtype: "error_max_turns",
+          // shape doesn't matter for the runner — only type+subtype are read
+        };
+      },
+    });
+
+    const { runPipeline } = await loadRunner();
+    await expect(
+      runPipeline({
+        repoRoot: "/repo",
+        request: "x",
+        phases: ["plan"],
+        runId: "run-1",
+        autoApprove: true,
+      }),
+    ).rejects.toThrow(/error_max_turns/);
+
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    const phaseEnd = events.find((e) => e.type === "PhaseEnd");
+    expect(phaseEnd).toBeDefined();
+    expect(phaseEnd.outcome).toBe("failed");
+    expect(phaseEnd.errorMessage).toContain("error_max_turns");
+  });
+
+  it("treats result with subtype=success as a clean end (no throw)", async () => {
+    mockQuery.mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield { type: "result", subtype: "success" };
+      },
+    });
+
+    const { runPipeline } = await loadRunner();
+    await expect(
+      runPipeline({
+        repoRoot: "/repo",
+        request: "x",
+        phases: ["plan"],
+        runId: "run-1",
+        autoApprove: true,
+      }),
+    ).resolves.toBeUndefined();
+
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    const phaseEnd = events.find((e) => e.type === "PhaseEnd");
+    expect(phaseEnd?.outcome).toBe("completed");
+  });
+
+  it("logs mid-stream system errors but does not abort the phase", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockQuery.mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield { type: "system", subtype: "error", message: "transient blip" };
+        // SDK keeps going and finishes cleanly
+      },
+    });
+
+    const { runPipeline } = await loadRunner();
+    await runPipeline({
+      repoRoot: "/repo",
+      request: "x",
+      phases: ["plan"],
+      runId: "run-1",
+      autoApprove: true,
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("transient"),
+      expect.any(Object),
+    );
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    expect(events.find((e) => e.type === "PhaseEnd")?.outcome).toBe("completed");
+    warnSpy.mockRestore();
+  });
+});
+
+describe("hardening: stale-phase recovery on startup", () => {
+  let mockQuery: any;
+  let mockShared: any;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const sdk = await import("@anthropic-ai/claude-agent-sdk");
+    mockQuery = vi.mocked(sdk.query);
+    mockQuery.mockReturnValue(emptyAsyncIterable());
+    mockShared = await import("@brownfield-surgeon/shared");
+  });
+
+  it("resets a phase that was left in 'running' from a crashed previous run", async () => {
+    const stale = emptyVitals({ runId: "old", repoRoot: "/repo", engine: "sdk" });
+    stale.phaseStatus.map = "running";
+    vi.mocked(mockShared.readVitals).mockResolvedValue(stale);
+
+    const { runPipeline } = await loadRunner();
+    await runPipeline({
+      repoRoot: "/repo",
+      request: "x",
+      phases: [],
+      runId: "run-new",
+      autoApprove: true,
+    });
+
+    // setPhaseStatus is implemented via writeVitals — check that "map"
+    // was written with status "failed" before any new phase work began.
+    const writeCalls = vi.mocked(mockShared.writeVitals).mock.calls;
+    const hadFailedMap = writeCalls.some(
+      (c: any[]) => (c[1] as any).phaseStatus.map === "failed",
+    );
+    expect(hadFailedMap).toBe(true);
+
+    // And we emitted a PhaseEnd(failed) event for the recovered phase.
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    const recovered = events.find(
+      (e) => e.type === "PhaseEnd" && e.phase === "map" && e.outcome === "failed",
+    );
+    expect(recovered).toBeDefined();
+    expect(recovered.errorMessage).toMatch(/previous crash/i);
+  });
+
+  it("does not touch phases in pending/completed/failed/awaiting-approval states", async () => {
+    const v = emptyVitals({ runId: "old", repoRoot: "/repo", engine: "sdk" });
+    v.phaseStatus.plan = "completed";
+    v.phaseStatus.map = "awaiting-approval";
+    v.phaseStatus.break = "failed";
+    vi.mocked(mockShared.readVitals).mockResolvedValue(v);
+
+    const { runPipeline } = await loadRunner();
+    await runPipeline({
+      repoRoot: "/repo",
+      request: "x",
+      phases: [],
+      runId: "run-new",
+      autoApprove: true,
+    });
+
+    // No event should be emitted for non-running phases.
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    expect(events.length).toBe(0);
+  });
+});
+
+describe("hardening: inactivity watchdog", () => {
+  let mockQuery: any;
+  let mockShared: any;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    const sdk = await import("@anthropic-ai/claude-agent-sdk");
+    mockQuery = vi.mocked(sdk.query);
+    mockShared = await import("@brownfield-surgeon/shared");
+    vi.mocked(mockShared.readVitals).mockResolvedValue(
+      emptyVitals({ runId: "run-1", repoRoot: "/repo", engine: "sdk" }),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls iterator.return() and throws InactivityTimeoutError when iterator stalls", async () => {
+    let resolveNext: (v: { done: true; value: undefined }) => void = () => {};
+    const nextPromise = new Promise<{ done: true; value: undefined }>((r) => {
+      resolveNext = r;
+    });
+    const returnSpy = vi.fn(() => {
+      resolveNext({ done: true, value: undefined });
+      return Promise.resolve({ done: true, value: undefined });
+    });
+    mockQuery.mockReturnValue({
+      [Symbol.asyncIterator]() {
+        return {
+          next: () => nextPromise,
+          return: returnSpy,
+        };
+      },
+    });
+
+    const { runPipeline } = await loadRunner();
+    // Attach .catch immediately so the rejection is never "unhandled" while
+    // we're advancing fake timers.
+    const settled = runPipeline({
+      repoRoot: "/repo",
+      request: "x",
+      phases: ["plan"],
+      runId: "run-1",
+      autoApprove: true,
+    }).then(
+      () => ({ ok: true as const }),
+      (err: Error) => ({ ok: false as const, err }),
+    );
+
+    // Yield to start the iterator, then advance past the 5-minute threshold.
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(6 * 60 * 1000);
+
+    const result = await settled;
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.err.message).toMatch(/idle/);
+    expect(returnSpy).toHaveBeenCalled();
+
+    const events = vi
+      .mocked(mockShared.appendEvent)
+      .mock.calls.map((c: any[]) => c[1]);
+    const phaseEnd = events.find((e) => e.type === "PhaseEnd");
+    expect(phaseEnd?.outcome).toBe("failed");
+    expect(phaseEnd?.errorMessage).toMatch(/idle/i);
   });
 });

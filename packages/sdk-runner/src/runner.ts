@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   appendEvent,
@@ -20,6 +22,25 @@ import { THINKING_TOKENS, type ThinkingLevel } from "./args.js";
 
 const ENGINE = "sdk" as const;
 
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+
+export class SdkSessionError extends Error {
+  constructor(
+    public readonly subtype: string,
+    public readonly raw: unknown,
+  ) {
+    super(`SDK session ended with ${subtype}`);
+    this.name = "SdkSessionError";
+  }
+}
+
+export class InactivityTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`SDK iterator idle for ${timeoutMs}ms`);
+    this.name = "InactivityTimeoutError";
+  }
+}
+
 export interface RunOptions {
   repoRoot: string;
   request: string;
@@ -39,15 +60,63 @@ interface PhaseContext {
 
 export async function runPipeline(opts: RunOptions): Promise<void> {
   await loadOrInitVitals(opts.repoRoot, opts.runId);
+  await recoverStalePhases(opts);
 
   for (const phase of opts.phases) {
     await runPhase(phase, opts);
   }
 }
 
+async function recoverStalePhases(opts: RunOptions): Promise<void> {
+  const vitals = await readVitals(opts.repoRoot);
+  if (!vitals) return;
+  const stale = (Object.keys(vitals.phaseStatus) as Phase[]).filter(
+    (p) => vitals.phaseStatus[p] === "running",
+  );
+  for (const p of stale) {
+    console.warn(`[sdk-runner] resetting stale phase "${p}" (was running) → failed`);
+    await setPhaseStatus(opts.repoRoot, p, "failed");
+    await emit(opts, {
+      ...makeBaseEvent({ phase: p, engine: ENGINE, runId: opts.runId }),
+      type: "PhaseEnd",
+      outcome: "failed",
+      durationMs: 0,
+      errorMessage: "phase recovered from previous crash",
+    });
+  }
+}
+
+type ActivePhase = { phase: Phase; opts: RunOptions };
+let activePhase: ActivePhase | null = null;
+
+export function markPhaseFailedSync(
+  repoRoot: string,
+  phase: Phase,
+  reason: string,
+): void {
+  try {
+    const vitalsPath = path.join(repoRoot, "plan", "vitals.json");
+    const raw = readFileSync(vitalsPath, "utf8");
+    const v = JSON.parse(raw);
+    v.phaseStatus[phase] = "failed";
+    if (v.currentPhase === phase) v.currentPhase = null;
+    v.lastUpdated = new Date().toISOString();
+    writeFileSync(vitalsPath, JSON.stringify(v, null, 2), "utf8");
+    console.error(`[sdk-runner] marked phase "${phase}" failed: ${reason}`);
+  } catch (err) {
+    console.error("[sdk-runner] failed to write fatal vitals:", err);
+  }
+}
+
+export function markActivePhaseFailedSync(reason: string): void {
+  if (!activePhase) return;
+  markPhaseFailedSync(activePhase.opts.repoRoot, activePhase.phase, reason);
+}
+
 async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
   const startedAt = Date.now();
   const ctx: PhaseContext = { bashCommands: new Map(), lastCoverageKey: null };
+  activePhase = { phase, opts };
 
   await emit(opts, {
     ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
@@ -109,6 +178,8 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
       errorMessage: String(err),
     });
     throw err;
+  } finally {
+    activePhase = null;
   }
 }
 
@@ -137,7 +208,7 @@ async function streamQuery(
   ctx: PhaseContext,
 ): Promise<void> {
   const thinkingTokens = opts.thinking ? THINKING_TOKENS[opts.thinking] : undefined;
-  const iter = query({
+  const iterable = query({
     prompt,
     options: {
       cwd: opts.repoRoot,
@@ -148,8 +219,32 @@ async function streamQuery(
         : {}),
     },
   });
-  for await (const message of iter as AsyncIterable<SDKMessage>) {
-    await onMessage(message, opts, phase, ctx);
+
+  // Grab the iterator explicitly so the watchdog can call .return() on the
+  // SAME instance that the consumer loop is awaiting.
+  const iterator = (iterable as AsyncIterable<SDKMessage>)[Symbol.asyncIterator]();
+
+  let lastActivity = Date.now();
+  let watchdogFired = false;
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastActivity > INACTIVITY_TIMEOUT_MS) {
+      watchdogFired = true;
+      iterator.return?.(undefined);
+    }
+  }, 30_000);
+
+  try {
+    while (true) {
+      const { done, value } = await iterator.next();
+      if (done) break;
+      lastActivity = Date.now();
+      await onMessage(value, opts, phase, ctx);
+    }
+    if (watchdogFired) {
+      throw new InactivityTimeoutError(INACTIVITY_TIMEOUT_MS);
+    }
+  } finally {
+    clearInterval(watchdog);
   }
 }
 
@@ -160,6 +255,21 @@ async function onMessage(
   ctx: PhaseContext,
 ): Promise<void> {
   const anyMsg = message as any;
+
+  // Terminal SDK signal. `success` = clean end. Any `error_*` subtype means
+  // the SDK already exhausted its retries — surface as a phase failure.
+  if (anyMsg.type === "result") {
+    if (typeof anyMsg.subtype === "string" && anyMsg.subtype.startsWith("error_")) {
+      throw new SdkSessionError(anyMsg.subtype, anyMsg);
+    }
+    return;
+  }
+
+  // Mid-stream system warnings (transient, SDK is retrying). Log only.
+  if (anyMsg.type === "system" && anyMsg.subtype === "error") {
+    console.warn("[sdk-runner] transient system error:", anyMsg);
+    return;
+  }
 
   // Assistant turn — capture tool_use blocks for the ToolUse timeline and
   // remember Bash commands so we can match them to their eventual tool_result.
