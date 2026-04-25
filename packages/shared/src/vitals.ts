@@ -48,6 +48,7 @@ export const VitalsSchema = z.object({
   seamsFound: z.number().int().nonnegative().default(0),
   dependenciesBroken: z.number().int().nonnegative().default(0),
   artifacts: z.array(z.string()).default([]),
+  baselineRef: z.string().nullable().default(null),
 });
 export type Vitals = z.infer<typeof VitalsSchema>;
 
@@ -78,5 +79,6 @@ export function emptyVitals(args: {
     seamsFound: 0,
     dependenciesBroken: 0,
     artifacts: [],
+    baselineRef: null,
   };
 }

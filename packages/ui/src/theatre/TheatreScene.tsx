@@ -11,7 +11,7 @@ import { InstrumentTray } from "./InstrumentTray";
 import { useTheatreState } from "./useTheatreEvents";
 import { useEventCues } from "./audio/cues";
 import { getSoundEngine } from "./audio/SoundEngine";
-import { TheatrePhaseMonitor } from "./monitors/TheatrePhaseMonitor";
+import { OperatingFieldMonitor } from "./monitors/OperatingFieldMonitor";
 import { TheatreLogMonitor } from "./monitors/TheatreLogMonitor";
 import { PatientStatusMonitor } from "./monitors/PatientStatusMonitor";
 import { OperatingRoomDetails } from "./OperatingRoomDetails";
@@ -36,7 +36,7 @@ export function TheatreScene({
 }: SceneProps): JSX.Element {
   const monitorPanels = useMemo(
     () => [
-      { title: "Protocol", node: <TheatrePhaseMonitor vitals={vitals} /> },
+      { title: "Operating Field", node: <OperatingFieldMonitor /> },
       { title: "Patient Status", node: <PatientStatusMonitor vitals={vitals} events={events} /> },
       { title: "Surgical Log", node: <TheatreLogMonitor events={events} /> },
     ],

@@ -1,5 +1,7 @@
 type OscType = OscillatorNode["type"];
 
+const MEOW_URL = "/sounds/meow.mp3";
+
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -7,6 +9,8 @@ export class SoundEngine {
   private approvalTimer: number | null = null;
   private muted = false;
   private volume = 0.5;
+  private meowBuffer: AudioBuffer | null = null;
+  private meowLoading: Promise<void> | null = null;
 
   async start(): Promise<void> {
     if (this.ctx) {
@@ -92,6 +96,44 @@ export class SoundEngine {
     for (let i = 0; i < 3; i++) {
       this.tone({ freq: 880, type: "sawtooth", dur: 0.15, gain: 0.6, delay: i * 0.2 });
     }
+  }
+
+  meow(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    if (this.meowBuffer) {
+      this.playMeowBuffer(ctx, master, this.meowBuffer);
+      return;
+    }
+    if (this.meowLoading) return;
+    this.meowLoading = fetch(MEOW_URL)
+      .then((r) => r.arrayBuffer())
+      .then((ab) => ctx.decodeAudioData(ab))
+      .then((buf) => {
+        this.meowBuffer = buf;
+        // Play immediately on first load so the cue isn't lost.
+        if (this.master) this.playMeowBuffer(ctx, this.master, buf);
+      })
+      .catch(() => {
+        /* swallow — meow is non-essential */
+      })
+      .finally(() => {
+        this.meowLoading = null;
+      });
+  }
+
+  private playMeowBuffer(
+    ctx: AudioContext,
+    master: GainNode,
+    buf: AudioBuffer,
+  ): void {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = 0.9;
+    src.connect(g).connect(master);
+    src.start();
   }
 
   finishChord(): void {

@@ -2,8 +2,13 @@ import { useFrame } from "@react-three/fiber";
 import { Html, useGLTF, useAnimations } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import type { Phase } from "../types";
+import { PHASES, type Phase } from "../types";
 import type { GlyphState } from "./useTheatreEvents";
+
+const DORMANT_GLYPHS: Record<Phase, GlyphState> = PHASES.reduce(
+  (acc, p) => ({ ...acc, [p]: "dormant" as GlyphState }),
+  {} as Record<Phase, GlyphState>,
+);
 
 // Toon Cat FREE model (Omabuarts Studio, CC-BY-4.0).
 // See public/models/license.txt for the full attribution.
@@ -67,7 +72,14 @@ export function Patient({
   repoName,
 }: PatientProps): JSX.Element {
   const groupRef = useRef<THREE.Group>(null);
-  const targetHealth = healthForPhase(phase, glyphs);
+
+  // Pre-surgery: no run is in progress and nothing has finished in this UI
+  // session. Stale "completed" phaseStatus from a previous run on disk would
+  // otherwise heal the cat before plan even starts. Override the visual state
+  // to a fully sick patient until a phase actually runs.
+  const isPreSurgery = phase === null && finishedTs === 0;
+  const effectiveGlyphs = isPreSurgery ? DORMANT_GLYPHS : glyphs;
+  const targetHealth = isPreSurgery ? 0 : healthForPhase(phase, glyphs);
 
   // Trot-away choreography on finish: walk to edge → jump down → walk on floor.
   // Reset on new iteration.
@@ -130,12 +142,13 @@ export function Patient({
           targetHealth={targetHealth}
           phase={phase}
           finishedTs={finishedTs}
+          isPreSurgery={isPreSurgery}
         />
       </Suspense>
-      <Vines glyphs={glyphs} />
+      <Vines glyphs={effectiveGlyphs} />
       {phase === "plan" && <LaserScan />}
       {phase === "map" && <SeamLabels repoName={repoName} />}
-      {glyphs.break !== "complete" && <BloodDrips />}
+      {effectiveGlyphs.break !== "complete" && <BloodDrips />}
       {phase === "implement" && (
         <ImplementShimmer lastArtifactTs={lastArtifactTs} />
       )}
@@ -161,10 +174,12 @@ function CatModel({
   targetHealth,
   phase,
   finishedTs,
+  isPreSurgery,
 }: {
   targetHealth: number;
   phase: Phase | null;
   finishedTs: number;
+  isPreSurgery: boolean;
 }): JSX.Element {
   const { scene, animations } = useGLTF(CAT_MODEL_URL);
 
@@ -260,10 +275,16 @@ function CatModel({
     }
 
     // Anim speed: frozen when very sick → full speed when healthy or trotting.
+    // Pre-surgery (no run started) explicitly freezes regardless of stale h.
     const first = Object.values(actions)[0];
     if (first) {
-      const target =
-        finishedTs > 0 ? 1.4 : phase === "implement" ? 0.5 : 0.2 + h * 0.8;
+      const target = isPreSurgery
+        ? 0.0
+        : finishedTs > 0
+          ? 1.4
+          : phase === "implement"
+            ? 0.5
+            : h;
       first.timeScale = THREE.MathUtils.damp(
         first.timeScale,
         target,

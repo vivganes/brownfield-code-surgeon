@@ -1,5 +1,6 @@
 import {
   emptyVitals,
+  readHeadSha,
   readVitals,
   writeVitals,
   type Phase,
@@ -12,8 +13,19 @@ export async function loadOrInitVitals(
   runId: string,
 ): Promise<Vitals> {
   const existing = await readVitals(repoRoot);
-  if (existing) return existing;
+  if (existing) {
+    // Backfill baselineRef on vitals written before the field existed.
+    if (!existing.baselineRef) {
+      const head = readHeadSha(repoRoot);
+      if (head) {
+        existing.baselineRef = head;
+        await writeVitals(repoRoot, existing);
+      }
+    }
+    return existing;
+  }
   const fresh = emptyVitals({ runId, repoRoot, engine: "sdk" });
+  fresh.baselineRef = readHeadSha(repoRoot);
   await writeVitals(repoRoot, fresh);
   return fresh;
 }

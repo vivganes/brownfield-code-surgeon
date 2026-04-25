@@ -52,7 +52,10 @@ export function useEventCues(events: SurgeryEvent[], enabled: boolean): void {
           break;
         }
         case "PhaseEnd":
-          if (ev.phase === "finish") engine.finishChord();
+          if (ev.phase === "finish") {
+            engine.meow();
+            engine.finishChord();
+          }
           break;
       }
     }

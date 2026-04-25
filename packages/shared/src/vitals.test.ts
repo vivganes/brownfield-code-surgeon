@@ -25,6 +25,13 @@ describe("emptyVitals", () => {
     expect(v.dependenciesBroken).toBe(0);
   });
 
+  it("baselineRef defaults to null and round-trips through the schema", () => {
+    const v = emptyVitals({ runId: "r1", repoRoot: "/tmp/repo", engine: "sdk" });
+    expect(v.baselineRef).toBeNull();
+    const withSha = { ...v, baselineRef: "abc123" };
+    expect(() => VitalsSchema.parse(withSha)).not.toThrow();
+  });
+
   it("startedAt and lastUpdated are valid ISO timestamps", () => {
     const v = emptyVitals({ runId: "r1", repoRoot: "/tmp/repo", engine: "sdk" });
     expect(() => new Date(v.startedAt).toISOString()).not.toThrow();

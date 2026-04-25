@@ -9,6 +9,7 @@ vi.mock("@brownfield-surgeon/shared", async () => {
     ...actual,
     readVitals: vi.fn(),
     writeVitals: vi.fn(),
+    readHeadSha: vi.fn(() => null),
   };
 });
 
@@ -72,6 +73,56 @@ describe("loadOrInitVitals", () => {
       runId: "run-123",
       repoRoot: "/repo",
     }));
+  });
+
+  it("captures HEAD SHA into baselineRef when initializing fresh vitals", async () => {
+    const shared = await import("@brownfield-surgeon/shared");
+    vi.mocked(shared.readHeadSha).mockReturnValueOnce("abc123def456");
+    mockReadVitals.mockResolvedValue(null);
+
+    const result = await loadOrInitVitals("/repo", "run-1");
+
+    expect(result.baselineRef).toBe("abc123def456");
+    expect(mockWriteVitals).toHaveBeenCalledWith(
+      "/repo",
+      expect.objectContaining({ baselineRef: "abc123def456" }),
+    );
+  });
+
+  it("leaves baselineRef null when not a git repo", async () => {
+    const shared = await import("@brownfield-surgeon/shared");
+    vi.mocked(shared.readHeadSha).mockReturnValueOnce(null);
+    mockReadVitals.mockResolvedValue(null);
+
+    const result = await loadOrInitVitals("/repo", "run-1");
+
+    expect(result.baselineRef).toBeNull();
+  });
+
+  it("backfills baselineRef on existing vitals that lack it", async () => {
+    const shared = await import("@brownfield-surgeon/shared");
+    const existing = emptyVitals({ runId: "old", repoRoot: "/repo", engine: "sdk" });
+    expect(existing.baselineRef).toBeNull();
+    mockReadVitals.mockResolvedValue(existing);
+    vi.mocked(shared.readHeadSha).mockReturnValueOnce("backfilled-sha");
+
+    const result = await loadOrInitVitals("/repo", "new-run");
+
+    expect(result.baselineRef).toBe("backfilled-sha");
+    expect(mockWriteVitals).toHaveBeenCalledOnce();
+  });
+
+  it("does not overwrite an existing baselineRef on subsequent loads", async () => {
+    const shared = await import("@brownfield-surgeon/shared");
+    const existing = emptyVitals({ runId: "old", repoRoot: "/repo", engine: "sdk" });
+    existing.baselineRef = "original-sha";
+    mockReadVitals.mockResolvedValue(existing);
+    vi.mocked(shared.readHeadSha).mockReturnValueOnce("different-sha");
+
+    const result = await loadOrInitVitals("/repo", "new-run");
+
+    expect(result.baselineRef).toBe("original-sha");
+    expect(mockWriteVitals).not.toHaveBeenCalled();
   });
 });
 

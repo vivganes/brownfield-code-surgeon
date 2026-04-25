@@ -13,6 +13,7 @@ const engineMock = {
   approvalConfirm: vi.fn(),
   testFailAlarm: vi.fn(),
   finishChord: vi.fn(),
+  meow: vi.fn(),
 };
 
 vi.mock("./SoundEngine", () => ({
@@ -230,6 +231,7 @@ describe("useEventCues", () => {
     ];
     render(<Harness events={events} enabled={true} />);
     expect(engineMock.finishChord).toHaveBeenCalledTimes(1);
+    expect(engineMock.meow).toHaveBeenCalledTimes(1);
   });
 
   it("only emits cues for newly added events between renders", () => {

@@ -12,6 +12,7 @@ import {
   approvalFile,
   PhaseSchema,
   writeApproval,
+  readChangesSince,
   readEvents,
   readVitals,
   type SurgeryEvent,
@@ -167,6 +168,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   if (pathname === "/api/events" && req.method === "GET") {
     const evs = await readEvents(REPO_ROOT);
     json(res, 200, evs);
+    return;
+  }
+  if (pathname === "/api/changes" && req.method === "GET") {
+    const v = await readVitals(REPO_ROOT);
+    const baseline = v?.baselineRef ?? null;
+    const result = readChangesSince(REPO_ROOT, baseline);
+    json(res, 200, result);
     return;
   }
   if (pathname === "/api/plan" && req.method === "GET") {
