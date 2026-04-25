@@ -342,15 +342,34 @@ async function runOnce(): Promise<void> {
   log(`run ${runId} complete`);
 }
 
+const RESTART_SIGNAL = path.join(REPO_ROOT, ARTIFACT_PATHS.surgeryDir, "restart.signal");
+
+async function waitForRestartSignal(): Promise<void> {
+  log(`waiting for restart signal at ${RESTART_SIGNAL} ...`);
+  // Poll for the marker file. UI POST /api/restart writes it; we delete on read.
+  while (true) {
+    try {
+      await fsp.stat(RESTART_SIGNAL);
+      await fsp.unlink(RESTART_SIGNAL).catch(() => {});
+      log("restart signal received");
+      return;
+    } catch {
+      // not yet
+    }
+    await sleep(500);
+  }
+}
+
 async function main(): Promise<void> {
   log(`repo root: ${REPO_ROOT}`);
   log(`tick:      ${TICK_MS}ms`);
   log(`loop:      ${LOOP}`);
+  // Clear any stale signal from a previous process.
+  await fsp.unlink(RESTART_SIGNAL).catch(() => {});
   do {
     await runOnce();
     if (LOOP) {
-      log("pausing 5s before next simulated run...");
-      await sleep(5000);
+      await waitForRestartSignal();
     }
   } while (LOOP);
 }

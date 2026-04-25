@@ -21,7 +21,9 @@ type Slot = {
 
 const SLOTS: Slot[] = [
   { pos: [-8.0, 2.0, 0], plane: [2.4, 1.7] },
-  { pos: [0, 2.4, 0], plane: [3.6, 2.3] },
+  // Center monitor is the Patient Status — moved higher and pushed back
+  // toward the wall so it never sits in the camera's line to the cat.
+  { pos: [0, 3.4, -0.45], plane: [2.8, 1.7] },
   { pos: [8.0, 2.0, 0], plane: [2.4, 1.7] },
 ];
 

@@ -194,3 +194,55 @@ html, body, #root {
   cursor: pointer;
 }
 .controls button:hover { border-color: var(--accent); }
+
+
+/* Restart button — surgery complete CTA */
+.restart-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px 12px 24px;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e6fffa;
+  background: linear-gradient(135deg, rgba(20, 30, 55, 0.92), rgba(15, 22, 40, 0.92));
+  border: 1px solid rgba(94, 234, 212, 0.55);
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.08) inset,
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 18px rgba(94, 234, 212, 0.18);
+  transition: transform 160ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  animation: restart-pulse 2.6s ease-in-out infinite;
+}
+.restart-btn::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5eead4;
+  box-shadow: 0 0 10px #5eead4, 0 0 18px rgba(94, 234, 212, 0.6);
+}
+.restart-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(94, 234, 212, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.18) inset,
+    0 10px 28px rgba(0, 0, 0, 0.4),
+    0 0 28px rgba(94, 234, 212, 0.35);
+}
+.restart-btn:active {
+  transform: translateY(0);
+}
+@keyframes restart-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.08) inset, 0 8px 24px rgba(0,0,0,0.35), 0 0 18px rgba(94, 234, 212, 0.18); }
+  50%      { box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.18) inset, 0 8px 24px rgba(0,0,0,0.35), 0 0 32px rgba(94, 234, 212, 0.45); }
+}
+

@@ -182,6 +182,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     await handleApproval(req, res, approvalMatch[1]!);
     return;
   }
+  if (pathname === "/api/restart" && req.method === "POST") {
+    const signalPath = path.join(REPO_ROOT, ARTIFACT_PATHS.surgeryDir, "restart.signal");
+    try {
+      await fsp.mkdir(path.dirname(signalPath), { recursive: true });
+      await fsp.writeFile(signalPath, new Date().toISOString(), "utf8");
+      json(res, 200, { ok: true, signal: signalPath });
+    } catch (err) {
+      json(res, 500, { error: String(err) });
+    }
+    return;
+  }
   if (pathname === "/api/run/start" && req.method === "POST") {
     const body = await readBody(req).catch(() => "");
     let payload: any = {};

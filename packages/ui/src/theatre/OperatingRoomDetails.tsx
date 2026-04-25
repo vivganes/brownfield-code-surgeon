@@ -7,7 +7,6 @@ export function OperatingRoomDetails(): JSX.Element {
   return (
     <group>
       <IvDrip position={[-3.4, -1.5, 1.2]} />
-      <AnesthesiaMachine position={[3.2, -1.5, 1.0]} />
       <MonitorCart position={[-5.5, -1.5, 2.4]} />
       <SupplyCabinet position={[-10.5, -1.5, -3]} rotation={[0, Math.PI / 2, 0]} />
       <SupplyCabinet position={[10.5, -1.5, -3]} rotation={[0, -Math.PI / 2, 0]} />

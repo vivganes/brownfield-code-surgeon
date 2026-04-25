@@ -5,7 +5,7 @@ import type { Phase, SurgeryEvent, Vitals } from "../types";
 import { PHASES } from "../types";
 import { Room } from "./Room";
 import { OperatingTable } from "./OperatingTable";
-import { MudBall } from "./MudBall";
+import { Patient } from "./Patient";
 import { MonitorWall } from "./MonitorWall";
 import { InstrumentTray } from "./InstrumentTray";
 import { useTheatreState } from "./useTheatreEvents";
@@ -49,6 +49,9 @@ export function TheatreScene({
   const [volume, setVolume] = useState(0.5);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [ackFinishTs, setAckFinishTs] = useState(0);
+  const effectiveFinishedTs =
+    state.finishedTs > ackFinishTs ? state.finishedTs : 0;
 
   useEffect(() => {
     const s = getSoundEngine();
@@ -121,7 +124,13 @@ export function TheatreScene({
         <Room alarm={alarm} lampTarget={lampTarget} />
         <OperatingRoomDetails />
         <OperatingTable />
-        <MudBall label={repoName} lastArtifactTs={state.lastArtifactTs} />
+        <Patient
+          phase={state.activePhase}
+          glyphs={state.glyphs}
+          lastArtifactTs={state.lastArtifactTs}
+          finishedTs={effectiveFinishedTs}
+          repoName={repoName}
+        />
         <MonitorWall panels={monitorPanels} onOpen={setOpenIndex} />
         <InstrumentTray
           glyphs={state.glyphs}
@@ -169,6 +178,29 @@ export function TheatreScene({
         />
       </div>
 
+      {effectiveFinishedTs > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            bottom: 24,
+            transform: "translateX(-50%)",
+            zIndex: 10,
+          }}
+        >
+          <button
+            className="restart-btn"
+            onClick={() => {
+              setAckFinishTs(state.finishedTs);
+              void fetch("/api/restart", { method: "POST" }).catch(() => {});
+            }}
+            title="Bring the patient back for a new iteration"
+          >
+            restart surgery
+          </button>
+        </div>
+      )}
+
       {openIndex != null && monitorPanels[openIndex] && (
         <MonitorPopup
           title={monitorPanels[openIndex].title}
@@ -210,6 +242,9 @@ export function TheatreScene({
           <span style={{ color: "#5eead4" }}>drag</span> rotate ·{" "}
           <span style={{ color: "#5eead4" }}>right-drag</span> pan ·{" "}
           <span style={{ color: "#5eead4" }}>wheel</span> zoom
+        </div>
+        <div style={{ marginTop: 4, fontSize: 9, color: "#4a5278" }}>
+          patient model: "Toon Cat FREE" by Omabuarts Studio · CC-BY-4.0
         </div>
       </div>
     </div>

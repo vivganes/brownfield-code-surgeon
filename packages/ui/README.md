@@ -43,3 +43,24 @@ Open `http://localhost:5173`.
 |---|---|---|
 | `SURGERY_REPO_ROOT` | `cwd` | Repo whose `.surgery/` and `plan/` the UI follows |
 | `SURGERY_UI_PORT`   | `7777` | Backend port |
+
+## The Patient (cat)
+
+The codebase under surgery is rendered as a cat on the operating table
+(`src/theatre/Patient.tsx`). It progresses through 7 visual states tied to the
+workflow phases: vines wrap it (idle), a laser scans it (plan), file-name
+labels pin to seams (map), vines fall away (break), stitches appear (cover),
+fur shimmers warm (implement), it glows (refactor), and it trots out of frame
+(finish).
+
+The cat is the **Toon Cat FREE** model loaded from `public/models/toon_cat_free.glb`.
+A primitives-only fallback (`PrimitiveCat`) is kept in `Patient.tsx` for
+emergencies. Surrounding visuals (vines / laser / labels / stitches / glow /
+trot) are asset-agnostic.
+
+### Model attribution
+
+This work is based on ["Toon Cat FREE"](https://sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386)
+by [Omabuarts Studio](https://sketchfab.com/omabuarts), licensed under
+[CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/).
+See `public/models/license.txt` for the unmodified license file.
