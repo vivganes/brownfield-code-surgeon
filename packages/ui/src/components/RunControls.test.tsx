@@ -109,7 +109,7 @@ describe("RunControls", () => {
     });
 
     fireEvent.click(screen.getByText("+ New Surgery"));
-    const startBtn = screen.getByText("Start Surgery using Claude SDK");
+    const startBtn = screen.getByRole("button", { name: /^Start$/ });
     expect(startBtn).toBeDisabled();
   });
 
@@ -123,9 +123,12 @@ describe("RunControls", () => {
     });
 
     fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     const textarea = screen.getByPlaceholderText(/add a \/comments endpoint/i);
     fireEvent.change(textarea, { target: { value: "do something" } });
-    expect(screen.getByText("Start Surgery using Claude SDK")).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Start$/ })).not.toBeDisabled();
   });
 
   it("Cancel closes the modal", async () => {
@@ -179,10 +182,13 @@ describe("RunControls", () => {
     });
 
     fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "build a thing" },
     });
-    fireEvent.click(screen.getByText("Start Surgery using Claude SDK"));
+    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -216,10 +222,13 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
     fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "   build a thing   " },
     });
-    fireEvent.click(screen.getByText("Start Surgery using Claude SDK"));
+    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect(JSON.parse(capturedBody!).request).toBe("build a thing");
@@ -238,10 +247,13 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
     fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "x" },
     });
-    fireEvent.click(screen.getByText("Start Surgery using Claude SDK"));
+    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
 
     await waitFor(() => {
       expect(screen.getByText("engine busy")).toBeInTheDocument();
@@ -327,10 +339,13 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
     fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "do" },
     });
-    fireEvent.click(screen.getByText("Start Surgery using Claude SDK"));
+    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
     await waitFor(() => expect(capturedBody).toBeDefined());
     const parsed = JSON.parse(capturedBody!);
     expect(parsed.engine).toBe("sdk");
@@ -357,16 +372,16 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
     fireEvent.click(screen.getByText("+ New Surgery"));
-    await waitFor(() => screen.getByText(/Run on Managed Agents/i));
+    await waitFor(() => screen.getByText(/Run Finish Phase on Managed Agent/i));
 
     const managedCheckbox = screen.getByRole("checkbox", {
-      name: /run finish on managed runner/i,
+      name: /run finish phase on managed agent/i,
     });
     fireEvent.click(managedCheckbox);
     expect(managedCheckbox).toBeChecked();
 
     // Start button should be disabled.
-    const startBtn = screen.getByText("Start Surgery on Managed Agents");
+    const startBtn = screen.getByRole("button", { name: /^Start$/ });
     expect(startBtn).toBeDisabled();
     // Configure ⚙ button surfaced inline.
     expect(screen.getByText(/Configure/i)).toBeInTheDocument();
@@ -407,13 +422,16 @@ describe("RunControls", () => {
     );
 
     fireEvent.click(screen.getByText("+ New Surgery"));
-    await waitFor(() => screen.getByText(/Run on Managed Agents/i));
+    await waitFor(() => screen.getByText(/Run Finish Phase on Managed Agent/i));
 
+    fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
+      target: { value: "/repo" },
+    });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "build a thing" },
     });
     fireEvent.click(
-      screen.getByRole("checkbox", { name: /run finish on managed runner/i }),
+      screen.getByRole("checkbox", { name: /run finish phase on managed agent/i }),
     );
 
     // Wait for repo/origin pre-fill.
@@ -421,7 +439,7 @@ describe("RunControls", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/repo/origin"),
     );
 
-    fireEvent.click(screen.getByText("Start Surgery on Managed Agents"));
+    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
     await waitFor(() => expect(capturedBody).toBeDefined());
     const parsed = JSON.parse(capturedBody!);
     expect(parsed.engine).toBe("managed");

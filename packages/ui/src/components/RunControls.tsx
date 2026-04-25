@@ -22,6 +22,75 @@ const THINKING_LEVELS: Array<{ id: ThinkingLevel; label: string; tag: string }> 
   { id: "high", label: "High", tag: "~12k thinking tokens, deepest" },
 ];
 
+// Scrollbar styling for modal content
+const scrollbarStyles = `
+  .modal-content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .modal-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .modal-content::-webkit-scrollbar-thumb {
+    background: rgba(94, 234, 212, 0.3);
+    border-radius: 4px;
+  }
+
+  .modal-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(94, 234, 212, 0.5);
+  }
+`;
+
+interface CommandBlockProps {
+  command: string;
+}
+
+function CommandBlock({ command }: CommandBlockProps): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+      <div
+        style={{
+          background: "var(--panel-2)",
+          padding: "6px 8px",
+          borderRadius: 2,
+          fontSize: 11,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          flex: 1,
+          wordBreak: "break-all",
+        }}
+      >
+        {command}
+      </div>
+      <button
+        onClick={handleCopy}
+        title={copied ? "Copied!" : "Copy command"}
+        style={{
+          background: "transparent",
+          border: "1px solid rgba(94,234,212,0.3)",
+          color: copied ? "var(--accent)" : "var(--muted)",
+          borderRadius: 2,
+          padding: "4px 8px",
+          fontSize: 11,
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+          transition: "color 0.2s",
+        }}
+      >
+        {copied ? "✓" : "copy"}
+      </button>
+    </div>
+  );
+}
+
 export function RunControls(): JSX.Element {
   const [status, setStatus] = useState<RunStatus>({ running: false, state: null });
   const [modalOpen, setModalOpen] = useState(false);
@@ -137,6 +206,8 @@ export function RunControls(): JSX.Element {
   );
 }
 
+type RunInMode = "plugin" | "sdk";
+
 function NewSurgeryModal({
   settings,
   onOpenSettings,
@@ -148,6 +219,7 @@ function NewSurgeryModal({
   onClose: () => void;
   onStarted: (state: RunStatus["state"]) => void;
 }): JSX.Element {
+  const [runIn, setRunIn] = useState<RunInMode>("sdk");
   const [request, setRequest] = useState("");
   const [workspace, setWorkspace] = useState("");
   const [model, setModel] = useState(MODELS[0]!.id);
@@ -158,6 +230,17 @@ function NewSurgeryModal({
   const [baseBranch, setBaseBranch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Inject scrollbar styles
+    const styleId = "modal-scrollbar-styles";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = scrollbarStyles;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -196,33 +279,37 @@ function NewSurgeryModal({
   const managedReady =
     !managedFinish ||
     (Boolean(settings?.githubTokenSet) && Boolean(settings?.agentEnvId));
+
+  const canSubmit =
+    submitting ||
+    !workspace.trim() ||
+    (runIn === "sdk" && !request.trim()) ||
+    (runIn === "sdk" && !managedReady);
+
   const start = async () => {
-    const trimmed = request.trim();
-    if (!trimmed || submitting) return;
-    if (!managedReady) {
-      setError(
-        "Managed Finish needs a GitHub token and a Managed-Agents environment. Click ⚙ to configure.",
-      );
-      return;
-    }
+    if (canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
       const payload: Record<string, unknown> = {
-        request: trimmed,
-        engine: managedFinish ? "managed" : "sdk",
-        model,
-        thinking,
-        autoApprove,
-        workspace: workspace.trim() || undefined,
+        workspace: workspace.trim(),
+        engine: runIn === "plugin" ? "plugin" : managedFinish ? "managed" : "sdk",
       };
-      if (managedFinish) {
-        payload.managed = {
-          repoUrl: repoUrl.trim() || undefined,
-          baseBranch: baseBranch.trim() || undefined,
-          agentEnvId: settings?.agentEnvId ?? undefined,
-        };
+
+      if (runIn === "sdk") {
+        payload.request = request.trim();
+        payload.model = model;
+        payload.thinking = thinking;
+        payload.autoApprove = autoApprove;
+        if (managedFinish) {
+          payload.managed = {
+            repoUrl: repoUrl.trim() || undefined,
+            baseBranch: baseBranch.trim() || undefined,
+            agentEnvId: settings?.agentEnvId ?? undefined,
+          };
+        }
       }
+
       const res = await fetch("/api/run/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -265,6 +352,7 @@ function NewSurgeryModal({
           borderRadius: 10,
           boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
           width: "min(640px, 100%)",
+          height: "min(90vh, 100%)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -302,7 +390,33 @@ function NewSurgeryModal({
           </button>
         </div>
 
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="modal-content" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflow: "auto", flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>
+              Run In
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg)" }}>
+              <input
+                type="radio"
+                name="runIn"
+                value="plugin"
+                checked={runIn === "plugin"}
+                onChange={() => setRunIn("plugin")}
+              />
+              Claude Code (as plugin)
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg)" }}>
+              <input
+                type="radio"
+                name="runIn"
+                value="sdk"
+                checked={runIn === "sdk"}
+                onChange={() => setRunIn("sdk")}
+              />
+              Claude Code SDK
+            </label>
+          </div>
+
           <label style={label}>
             <span>Workspace folder</span>
             <input
@@ -315,78 +429,144 @@ function NewSurgeryModal({
             />
           </label>
 
-          <label style={label}>
-            <span>Describe the change</span>
-            <textarea
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              placeholder="e.g. add a /comments endpoint that supports pagination and auth"
-              rows={5}
-              autoFocus
-              style={textarea}
-            />
-          </label>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {runIn === "sdk" && (
             <label style={label}>
-              <span>Model</span>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                style={select}
-              >
-                {MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                    {m.tag ? ` — ${m.tag}` : ""}
-                  </option>
-                ))}
-              </select>
+              <span>Describe the change</span>
+              <textarea
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+                placeholder="e.g. add a /comments endpoint that supports pagination and auth"
+                rows={5}
+                autoFocus
+                style={textarea}
+              />
             </label>
+          )}
 
-            <label style={label}>
-              <span>Thinking</span>
-              <select
-                value={thinking}
-                onChange={(e) => setThinking(e.target.value as ThinkingLevel)}
-                style={select}
+          {runIn === "plugin" && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--fg)",
+                background: "rgba(94,234,212,0.04)",
+                border: "1px solid rgba(94,234,212,0.2)",
+                borderRadius: 4,
+                padding: "12px 14px",
+                lineHeight: 1.6,
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <strong>Setup Instructions (first time only):</strong>
+              </div>
+              <ol style={{ margin: "0 0 16px 20px", paddingLeft: 0 }}>
+                <li style={{ marginBottom: 8 }}>
+                  Open a terminal and navigate to your workspace:
+                  <CommandBlock command={`cd ${workspace.trim() || "[workspace path]"}`} />
+                </li>
+                <li style={{ marginBottom: 8 }}>
+                  Start Claude Code:
+                  <CommandBlock command="claude" />
+                </li>
+                <li style={{ marginBottom: 8 }}>
+                  In Claude Code, run:
+                  <CommandBlock command="/plugin marketplace add vivganes/brownfield-code-surgery" />
+                </li>
+                <li style={{ marginBottom: 8 }}>
+                  Then run:
+                  <CommandBlock command="/plugin install brownfield-code-surgeon" />
+                </li>
+                <li>
+                  Finally, run:
+                  <CommandBlock command="/reload-plugins" />
+                </li>
+              </ol>
+
+              <div style={{ marginBottom: 12, borderTop: "1px solid rgba(94,234,212,0.2)", paddingTop: 12 }}>
+                <strong>Run Surgery:</strong>
+              </div>
+              <ol style={{ margin: 0, paddingLeft: 20 }}>
+                <li style={{ marginBottom: 8 }}>
+                  Open a terminal and navigate to your workspace:
+                  <CommandBlock command={`cd ${workspace.trim() || "[workspace path]"}`} />
+                </li>
+                <li style={{ marginBottom: 8 }}>
+                  Start Claude Code:
+                  <CommandBlock command="claude" />
+                </li>
+                <li style={{ marginBottom: 8 }}>
+                  In Claude Code, run:
+                  <CommandBlock command="/brownfield-code-surgeon:surgery <<describe the new functionality>>" />
+                </li>
+                <li>Once the surgery completes, vitals will appear below</li>
+              </ol>
+            </div>
+          )}
+
+          {runIn === "sdk" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={label}>
+                  <span>Model</span>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    style={select}
+                  >
+                    {MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                        {m.tag ? ` — ${m.tag}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={label}>
+                  <span>Thinking</span>
+                  <select
+                    value={thinking}
+                    onChange={(e) => setThinking(e.target.value as ThinkingLevel)}
+                    style={select}
+                  >
+                    {THINKING_LEVELS.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label} — {t.tag}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  color: "var(--muted)",
+                }}
               >
-                {THINKING_LEVELS.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label} — {t.tag}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                <input
+                  type="checkbox"
+                  aria-label="auto-approve each phase"
+                  checked={autoApprove}
+                  onChange={(e) => setAutoApprove(e.target.checked)}
+                />
+                auto-approve each phase (skip the hand-off gates)
+              </label>
+            </>
+          )}
 
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 12,
-              color: "var(--muted)",
-            }}
-          >
-            <input
-              type="checkbox"
-              aria-label="auto-approve each phase"
-              checked={autoApprove}
-              onChange={(e) => setAutoApprove(e.target.checked)}
-            />
-            auto-approve each phase (skip the hand-off gates)
-          </label>
-
-          <div
-            style={{
-              borderTop: "1px solid #1a1f3a",
-              paddingTop: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
+          {runIn === "sdk" && (
+            <div
+              style={{
+                borderTop: "1px solid #1a1f3a",
+                paddingTop: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
             <label
               style={{
                 display: "flex",
@@ -398,14 +578,14 @@ function NewSurgeryModal({
             >
               <input
                 type="checkbox"
-                aria-label="run finish on managed runner"
+                aria-label="run finish phase on managed agent"
                 checked={managedFinish}
                 onChange={(e) => setManagedFinish(e.target.checked)}
               />
               <span>
-                Run on Managed Agents (cloud)
+                Run Finish Phase on Managed Agent
                 <span style={{ display: "block", fontSize: 11, opacity: 0.7 }}>
-                  Spawns the run inside an Anthropic Managed-Agents environment instead of the local SDK runner.
+                  Runs only the finish phase in an Anthropic Managed-Agents environment. Earlier phases run locally.
                 </span>
               </span>
             </label>
@@ -479,7 +659,8 @@ function NewSurgeryModal({
                 )}
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {error && (
             <div
@@ -511,22 +692,14 @@ function NewSurgeryModal({
           </button>
           <button
             onClick={start}
-            disabled={submitting || !request.trim() || !managedReady}
+            disabled={canSubmit}
             style={{
               ...primaryBtn,
-              opacity:
-                submitting || !request.trim() || !managedReady ? 0.5 : 1,
-              cursor:
-                submitting || !request.trim() || !managedReady
-                  ? "not-allowed"
-                  : "pointer",
+              opacity: canSubmit ? 0.5 : 1,
+              cursor: canSubmit ? "not-allowed" : "pointer",
             }}
           >
-            {submitting
-              ? "starting…"
-              : managedFinish
-                ? "Start Surgery on Managed Agents"
-                : "Start Surgery using Claude SDK"}
+            {submitting ? "starting…" : "Start"}
           </button>
         </div>
       </div>
