@@ -211,8 +211,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
     try {
+      const workspace =
+        typeof payload.workspace === "string" && payload.workspace.trim()
+          ? path.resolve(payload.workspace.trim())
+          : REPO_ROOT;
       const state = runManager.start({
-        repoRoot: REPO_ROOT,
+        repoRoot: workspace,
         request,
         engine: payload.engine ?? "sdk",
         autoApprove: payload.autoApprove === true,

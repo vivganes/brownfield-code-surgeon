@@ -99,6 +99,7 @@ function NewSurgeryModal({
   onStarted: (state: RunStatus["state"]) => void;
 }): JSX.Element {
   const [request, setRequest] = useState("");
+  const [workspace, setWorkspace] = useState("");
   const [model, setModel] = useState(MODELS[0]!.id);
   const [thinking, setThinking] = useState<ThinkingLevel>("medium");
   const [autoApprove, setAutoApprove] = useState(false);
@@ -113,6 +114,20 @@ function NewSurgeryModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, submitting]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/health");
+        if (res.ok) {
+          const j = await res.json();
+          if (typeof j.repoRoot === "string") setWorkspace(j.repoRoot);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
   const start = async () => {
     const trimmed = request.trim();
     if (!trimmed || submitting) return;
@@ -122,7 +137,14 @@ function NewSurgeryModal({
       const res = await fetch("/api/run/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ request: trimmed, engine: "sdk", model, thinking, autoApprove }),
+        body: JSON.stringify({
+          request: trimmed,
+          engine: "sdk",
+          model,
+          thinking,
+          autoApprove,
+          workspace: workspace.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -199,6 +221,18 @@ function NewSurgeryModal({
         </div>
 
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+          <label style={label}>
+            <span>Workspace folder</span>
+            <input
+              type="text"
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+              placeholder="absolute path to the repo this surgery will run in"
+              spellCheck={false}
+              style={input}
+            />
+          </label>
+
           <label style={label}>
             <span>Describe the change</span>
             <textarea
@@ -327,6 +361,16 @@ const textarea: React.CSSProperties = {
   fontFamily: "ui-sans-serif, system-ui, sans-serif",
   resize: "vertical",
   lineHeight: 1.4,
+};
+
+const input: React.CSSProperties = {
+  background: "var(--panel-2)",
+  color: "var(--fg)",
+  border: "1px solid #22284a",
+  borderRadius: 4,
+  padding: "8px 12px",
+  fontSize: 13,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
 };
 
 const select: React.CSSProperties = {
