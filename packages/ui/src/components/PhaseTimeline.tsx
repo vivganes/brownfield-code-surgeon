@@ -54,5 +54,5 @@ function ApproveButton({ phase }: { phase: Phase }): JSX.Element {
       console.error("[approve] error:", err);
     }
   };
-  return <button onClick={onClick}>Approve incision</button>;
+  return <button onClick={onClick}>Approve</button>;
 }

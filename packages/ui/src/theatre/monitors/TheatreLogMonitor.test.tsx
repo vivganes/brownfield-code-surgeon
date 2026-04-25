@@ -184,7 +184,7 @@ describe("TheatreLogMonitor", () => {
       },
     ];
     render(<TheatreLogMonitor events={events} />);
-    expect(screen.getByText(/needs approval: Safe to continue/)).toBeInTheDocument();
+    expect(screen.getByText(/approval needed: Safe to continue/)).toBeInTheDocument();
   });
 
   it("displays ApprovalGranted event", () => {

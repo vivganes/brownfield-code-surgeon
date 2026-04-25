@@ -39,7 +39,7 @@ Options:
 Approval gates: after each phase the runner writes `ApprovalRequested` and waits
 for `plan/.approvals/<phase>.ok` to appear. Approve from:
 
-- the UI's **Approve incision** button, or
+- the UI's **Approve** button, or
 - the CLI: `touch plan/.approvals/cover.ok`
 
 ## Events & artifacts

@@ -96,12 +96,12 @@ describe("PhaseTimeline", () => {
         events={[]}
       />,
     );
-    expect(screen.getByText("Approve incision")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
   });
 
   it("does not show Approve button for non-approval phases", () => {
     render(<PhaseTimeline vitals={createVitals()} events={[]} />);
-    const approveButtons = screen.queryAllByText("Approve incision");
+    const approveButtons = screen.queryAllByText("Approve");
     expect(approveButtons).toHaveLength(0);
   });
 
@@ -122,7 +122,7 @@ describe("PhaseTimeline", () => {
         events={[]}
       />,
     );
-    const approveButtons = screen.getAllByText("Approve incision");
+    const approveButtons = screen.getAllByText("Approve");
     expect(approveButtons).toHaveLength(2);
   });
 
@@ -153,7 +153,7 @@ describe("PhaseTimeline", () => {
       />,
     );
 
-    const approveButton = screen.getByText("Approve incision");
+    const approveButton = screen.getByText("Approve");
     await user.click(approveButton);
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -193,7 +193,7 @@ describe("PhaseTimeline", () => {
       />,
     );
 
-    const approveButton = screen.getByText("Approve incision");
+    const approveButton = screen.getByText("Approve");
     await user.click(approveButton);
 
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -223,7 +223,7 @@ describe("PhaseTimeline", () => {
       />,
     );
 
-    const approveButton = screen.getByText("Approve incision");
+    const approveButton = screen.getByText("Approve");
     await user.click(approveButton);
 
     expect(consoleErrorSpy).toHaveBeenCalled();

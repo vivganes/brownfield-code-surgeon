@@ -115,22 +115,22 @@ function summarize(ev: SurgeryEvent): string {
   const e = ev as Record<string, unknown>;
   switch (ev.type) {
     case "ToolUse":
-      return `${e.tool ?? ""}${e.blocked ? " (blocked)" : ""}`;
+      return `${e.tool ?? ""}${e.blocked ? " (blocked)" : ""}${e.summary ? ` — ${e.summary}` : ""}`;
     case "ArtifactWritten":
-      return `${e.kind ?? ""}: ${e.path ?? ""}`;
+      return `${e.kind ?? ""}: ${e.path ?? ""}${e.bytes != null ? ` (${e.bytes}B)` : ""}`;
     case "PhaseStart":
       return `started${e.request ? ` — ${e.request}` : ""}`;
     case "PhaseEnd":
       return `${e.outcome ?? ""} in ${e.durationMs ?? "?"}ms`;
     case "TestRun":
-      return `${e.passed ?? 0}/${e.total ?? 0} passed${e.failed ? ` — ${e.failed} failing` : ""}`;
+      return `${e.passed ?? 0}/${e.total ?? 0} passed${e.failed ? ` (${e.failed} failing)` : ""}`;
     case "CoverageDelta": {
       const before = (e.before as { statements?: number } | undefined)?.statements;
       const after = (e.after as { statements?: number } | undefined)?.statements;
-      return `${before?.toFixed(1) ?? "?"}% → ${after?.toFixed(1) ?? "?"}%`;
+      return `stmts ${before?.toFixed(1) ?? "?"}% → ${after?.toFixed(1) ?? "?"}%`;
     }
     case "ApprovalRequested":
-      return `needs approval: ${e.summary ?? ""}`;
+      return `approval needed: ${e.summary ?? ""}`;
     case "ApprovalGranted":
       return `approved by ${e.approvedBy ?? ""}`;
     default:
