@@ -182,6 +182,42 @@ describe("parseArgs", () => {
       parseArgs(["--repo", ".", "--request", "x", "--push-to", "x"]),
     ).toThrow(/unknown flag: --push-to/);
   });
+
+  it("parses --permission-mode acceptEdits", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x", "--permission-mode", "acceptEdits"]);
+    expect(args.permissionMode).toBe("acceptEdits");
+  });
+
+  it("parses --permission-mode bypassPermissions", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x", "--permission-mode", "bypassPermissions"]);
+    expect(args.permissionMode).toBe("bypassPermissions");
+  });
+
+  it("throws on invalid --permission-mode value", () => {
+    expect(() =>
+      parseArgs(["--repo", ".", "--request", "x", "--permission-mode", "admin"]),
+    ).toThrow("--permission-mode must be acceptEdits|bypassPermissions");
+  });
+
+  it("defaults permissionMode to undefined", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x"]);
+    expect(args.permissionMode).toBeUndefined();
+  });
+
+  it("parses --allowed-tools as comma-separated list", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x", "--allowed-tools", "Bash,Read,Edit"]);
+    expect(args.allowedTools).toEqual(["Bash", "Read", "Edit"]);
+  });
+
+  it("trims whitespace from --allowed-tools entries", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x", "--allowed-tools", "Bash, Read , Edit"]);
+    expect(args.allowedTools).toEqual(["Bash", "Read", "Edit"]);
+  });
+
+  it("defaults allowedTools to undefined", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x"]);
+    expect(args.allowedTools).toBeUndefined();
+  });
 });
 
 describe("THINKING_TOKENS", () => {

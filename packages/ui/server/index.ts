@@ -28,6 +28,19 @@ import {
 import Anthropic from "@anthropic-ai/sdk";
 
 const PORT = Number(process.env.SURGERY_UI_PORT ?? 7777);
+
+// Grep backtick-quoted filenames (anything with a file extension) from markdown,
+// return deduplicated basenames.
+function extractSeamFiles(markdown: string): string[] {
+  const FILE_RE = /`([a-zA-Z0-9_\-./]+\.(?:ts|tsx|js|jsx|mjs|svelte|vue|py|rb|go|java|cs|kt|swift|rs|cpp|c|h|css|scss|html|json))`/g;
+  const seen = new Set<string>();
+  for (const m of markdown.matchAll(FILE_RE)) {
+    const basename = m[1]!.split("/").pop()!;
+    seen.add(basename);
+  }
+  return [...seen];
+}
+
 const REPO_ROOT = path.resolve(process.env.SURGERY_REPO_ROOT ?? process.cwd());
 
 type SSEClient = {
@@ -192,6 +205,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     await sendFile(res, seamsFile(REPO_ROOT), "text/markdown; charset=utf-8");
     return;
   }
+  if (pathname === "/api/seams/files" && req.method === "GET") {
+    try {
+      const md = await fsp.readFile(seamsFile(REPO_ROOT), "utf8");
+      json(res, 200, { files: extractSeamFiles(md) });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        json(res, 200, { files: [] });
+      } else {
+        json(res, 500, { error: String(err) });
+      }
+    }
+    return;
+  }
   const approvalMatch = pathname.match(/^\/api\/approvals\/([^/]+)$/);
   if (approvalMatch && req.method === "POST") {
     await handleApproval(req, res, approvalMatch[1]!);
@@ -319,6 +345,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         autoApprove: payload.autoApprove === true,
         runId: payload.runId,
         model: typeof payload.model === "string" ? payload.model : undefined,
+        permissionMode:
+          payload.permissionMode === "acceptEdits" || payload.permissionMode === "bypassPermissions"
+            ? payload.permissionMode
+            : undefined,
+        allowedTools: Array.isArray(payload.allowedTools)
+          ? payload.allowedTools.filter((t: unknown) => typeof t === "string")
+          : undefined,
         thinking:
           payload.thinking === "off" ||
           payload.thinking === "low" ||

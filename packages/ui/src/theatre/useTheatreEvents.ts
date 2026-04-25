@@ -9,12 +9,20 @@ export type GlyphState =
   | "complete"
   | "failed";
 
+export type BlockedTool = {
+  phase: Phase;
+  tool: string;
+  summary?: string;
+  timestamp: number;
+};
+
 export type TheatreState = {
   glyphs: Record<Phase, GlyphState>;
   activePhase: Phase | null;
   lastArtifactTs: number;
   lastTestFailTs: number;
   finishedTs: number;
+  blockedTools: BlockedTool[];
 };
 
 const EMPTY: Record<Phase, GlyphState> = PHASES.reduce(
@@ -46,6 +54,7 @@ export function deriveTheatreState(
   let lastArtifactTs = 0;
   let lastTestFailTs = 0;
   let finishedTs = 0;
+  const blockedTools: BlockedTool[] = [];
   for (const ev of events) {
     const t = Date.parse(ev.timestamp);
     if (Number.isNaN(t)) continue;
@@ -54,12 +63,12 @@ export function deriveTheatreState(
       const failed = (ev as { failed?: number }).failed ?? 0;
       if (failed > 0 && t > lastTestFailTs) lastTestFailTs = t;
     }
-    if (
-      ev.type === "PhaseEnd" &&
-      ev.phase === "finish" &&
-      t > finishedTs
-    ) {
+    if (ev.type === "PhaseEnd" && ev.phase === "finish" && t > finishedTs) {
       finishedTs = t;
+    }
+    if (ev.type === "ToolUse" && (ev as { blocked?: boolean }).blocked) {
+      const te = ev as { tool?: string; summary?: string; phase: Phase };
+      blockedTools.push({ phase: te.phase, tool: te.tool ?? "unknown", summary: te.summary, timestamp: t });
     }
   }
 
@@ -69,6 +78,7 @@ export function deriveTheatreState(
     lastArtifactTs,
     lastTestFailTs,
     finishedTs,
+    blockedTools,
   };
 }
 

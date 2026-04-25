@@ -31,6 +31,8 @@ export interface StartArgs {
   runId?: string;
   model?: string;
   thinking?: "off" | "low" | "medium" | "high";
+  permissionMode?: "acceptEdits" | "bypassPermissions";
+  allowedTools?: string[];
   /** Only consulted when engine === "managed". */
   managed?: ManagedFinishArgs;
 }
@@ -355,6 +357,8 @@ function planSdkRunner(args: SdkPlanArgs): SpawnPlan {
   if (args.runId) cliArgs.push("--run-id", args.runId);
   if (args.model) cliArgs.push("--model", args.model);
   if (args.thinking) cliArgs.push("--thinking", args.thinking);
+  if (args.permissionMode) cliArgs.push("--permission-mode", args.permissionMode);
+  if (args.allowedTools && args.allowedTools.length > 0) cliArgs.push("--allowed-tools", args.allowedTools.join(","));
   if (args.phases && args.phases.length > 0) {
     cliArgs.push("--phases", args.phases.join(","));
   }

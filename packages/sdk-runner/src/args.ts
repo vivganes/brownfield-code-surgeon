@@ -20,6 +20,8 @@ export interface CliArgs {
   model?: string;
   thinking?: ThinkingLevel;
   commitPerPhase: boolean;
+  permissionMode?: "acceptEdits" | "bypassPermissions";
+  allowedTools?: string[];
 }
 
 const HELP = `surgery-run — Brownfield Code Surgeon SDK runner
@@ -39,6 +41,10 @@ Options:
   --commit-per-phase    Run \`git add -A && git commit\` after each phase.
                         The orchestrator (run-manager) is responsible for
                         any single push at the end of the run.
+  --permission-mode <m> SDK permission mode: default|acceptEdits|bypassPermissions
+                        (default: acceptEdits)
+  --allowed-tools <t>   Comma-separated tool names to auto-allow without prompting
+                        e.g. Bash,Read,Write,Edit,Glob,Grep
   -h, --help            Show this help
 `;
 
@@ -86,6 +92,19 @@ export function parseArgs(argv: string[]): CliArgs {
       case "--commit-per-phase":
         args.commitPerPhase = true;
         break;
+      case "--permission-mode": {
+        const v = argv[++i];
+        if (v !== "acceptEdits" && v !== "bypassPermissions") {
+          throw new Error(`--permission-mode must be acceptEdits|bypassPermissions (got "${v}")`);
+        }
+        args.permissionMode = v;
+        break;
+      }
+      case "--allowed-tools": {
+        const tools = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+        if (tools.length > 0) args.allowedTools = tools;
+        break;
+      }
       case "-h":
       case "--help":
         args.help = true;

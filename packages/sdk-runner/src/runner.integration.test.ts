@@ -803,9 +803,9 @@ describe("hardening: inactivity watchdog", () => {
       (err: Error) => ({ ok: false as const, err }),
     );
 
-    // Yield to start the iterator, then advance past the 5-minute threshold.
+    // Yield to start the iterator, then advance past the 30-minute threshold.
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(6 * 60 * 1000);
+    await vi.advanceTimersByTimeAsync(31 * 60 * 1000);
 
     const result = await settled;
     expect(result.ok).toBe(false);

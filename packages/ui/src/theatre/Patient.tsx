@@ -1,6 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { Html, useGLTF, useAnimations } from "@react-three/drei";
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { PHASES, type Phase } from "../types";
 import type { GlyphState } from "./useTheatreEvents";
@@ -650,24 +650,29 @@ function LaserScan(): JSX.Element {
 // SeamLabels — file-name labels pinned to body parts during "map".
 // ---------------------------------------------------------------------------
 
-const SEAM_FILES = [
-  "auth.ts",
-  "router.ts",
-  "store.ts",
-  "useUser.ts",
-  "api.ts",
+const ANCHOR_POSITIONS: [number, number, number][] = [
+  [0.25, 0.95, 0.25],  // head
+  [0.0, 0.8, 0.3],     // upper back
+  [-0.2, 0.65, 0.28],  // mid back
+  [-0.4, 0.45, 0.25],  // hip
+  [0.3, 0.3, 0.28],    // front leg
 ];
 
 function SeamLabels({ repoName }: { repoName: string }): JSX.Element {
   void repoName;
-  // Coords sit on / near the toon-cat's silhouette (target length 1.8).
-  const anchors: { pos: [number, number, number]; label: string }[] = [
-    { pos: [0.25, 0.95, 0.25], label: SEAM_FILES[0]! }, // head
-    { pos: [0.0, 0.8, 0.3], label: SEAM_FILES[1]! }, // upper back
-    { pos: [-0.2, 0.65, 0.28], label: SEAM_FILES[2]! }, // mid back
-    { pos: [-0.4, 0.45, 0.25], label: SEAM_FILES[3]! }, // hip
-    { pos: [0.3, 0.3, 0.28], label: SEAM_FILES[4]! }, // front leg
-  ];
+  const [files, setFiles] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/seams/files")
+      .then((r) => r.ok ? r.json() : { files: [] })
+      .then((data: { files: string[] }) => setFiles(data.files))
+      .catch(() => {});
+  }, []);
+
+  const anchors = ANCHOR_POSITIONS.slice(0, files.length).map((pos, i) => ({
+    pos,
+    label: files[i]!,
+  }));
   return (
     <group>
       {anchors.map((a, i) => (

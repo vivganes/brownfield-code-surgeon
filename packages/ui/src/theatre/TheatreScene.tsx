@@ -44,6 +44,13 @@ export function TheatreScene({
   );
   const state = useTheatreState(vitals, events);
   const clickable = engine === "sdk";
+  const pendingApprovals = PHASES.filter(
+    (p) => state.glyphs[p] === "awaiting-approval",
+  );
+  const [dismissedBlockedTs, setDismissedBlockedTs] = useState(0);
+  const visibleBlockedTools = state.blockedTools.filter(
+    (b) => b.timestamp > dismissedBlockedTs,
+  );
   const [audioOn, _setAudioOn] = useState(true);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
@@ -220,6 +227,96 @@ export function TheatreScene({
             {monitorPanels[openIndex].node}
           </div>
         </MonitorPopup>
+      )}
+
+      {/* Approval popup */}
+      {pendingApprovals.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 30,
+            background: "rgba(10,14,32,0.95)",
+            border: "1px solid #5eead4",
+            borderRadius: 8,
+            padding: "20px 28px",
+            fontFamily: "ui-monospace, monospace",
+            color: "#e6ecff",
+            textAlign: "center",
+            minWidth: 260,
+          }}
+        >
+          <div style={{ color: "#5eead4", fontSize: 11, letterSpacing: "0.1em", marginBottom: 8 }}>
+            ⏸ AWAITING APPROVAL
+          </div>
+          {pendingApprovals.map((phase) => (
+            <div key={phase} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                phase <span style={{ color: "#ffd27a" }}>{phase}</span> complete
+              </div>
+              <button
+                onClick={() => onApprove(phase)}
+                style={{
+                  background: "#0f3d35",
+                  color: "#5eead4",
+                  border: "1px solid #5eead4",
+                  borderRadius: 4,
+                  padding: "5px 18px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                approve → proceed
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Blocked tools popup */}
+      {visibleBlockedTools.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 30,
+            background: "rgba(10,14,32,0.95)",
+            border: "1px solid #f87171",
+            borderRadius: 8,
+            padding: "14px 20px",
+            fontFamily: "ui-monospace, monospace",
+            color: "#e6ecff",
+            minWidth: 300,
+            maxWidth: 480,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ color: "#f87171", fontSize: 11, letterSpacing: "0.1em" }}>
+              ⛔ SDK PERMISSION DENIED
+            </span>
+            <button
+              onClick={() => setDismissedBlockedTs(Date.now())}
+              style={{ background: "none", border: "none", color: "#8892b8", cursor: "pointer", fontSize: 14, padding: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: "#8892b8", marginBottom: 10 }}>
+            The SDK blocked these tools. Rerun with a wider permission mode to allow them.
+          </div>
+          {visibleBlockedTools.map((b, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 11 }}>
+              <span style={{ color: "#f87171", minWidth: 60 }}>{b.tool}</span>
+              <span style={{ color: "#ffd27a" }}>[{b.phase}]</span>
+              {b.summary && <span style={{ color: "#8892b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.summary}</span>}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Controls hint */}

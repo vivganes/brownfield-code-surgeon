@@ -15,6 +15,11 @@ const MODELS: ModelOption[] = [
 ];
 
 type ThinkingLevel = "off" | "low" | "medium" | "high";
+type PermissionMode = "acceptEdits" | "bypassPermissions";
+const PERMISSION_MODES: Array<{ id: PermissionMode; label: string; tag: string }> = [
+  { id: "acceptEdits", label: "Accept Edits", tag: "auto-approve file writes; use allowed-tools to unblock specific commands" },
+  { id: "bypassPermissions", label: "Bypass All", tag: "auto-approve everything including Bash — use with care" },
+];
 const THINKING_LEVELS: Array<{ id: ThinkingLevel; label: string; tag: string }> = [
   { id: "off", label: "Off", tag: "fastest, no extended thinking" },
   { id: "low", label: "Low", tag: "~2k thinking tokens" },
@@ -225,6 +230,8 @@ function NewSurgeryModal({
   const [model, setModel] = useState(MODELS[0]!.id);
   const [thinking, setThinking] = useState<ThinkingLevel>("medium");
   const [autoApprove, setAutoApprove] = useState(false);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>("acceptEdits");
+  const [allowedTools, setAllowedTools] = useState("");
   const [managedFinish, setManagedFinish] = useState(false);
   const [repoUrl, setRepoUrl] = useState("");
   const [baseBranch, setBaseBranch] = useState("");
@@ -301,6 +308,9 @@ function NewSurgeryModal({
         payload.model = model;
         payload.thinking = thinking;
         payload.autoApprove = autoApprove;
+        payload.permissionMode = permissionMode;
+        const tools = allowedTools.split(",").map((s) => s.trim()).filter(Boolean);
+        if (tools.length > 0) payload.allowedTools = tools;
         if (managedFinish) {
           payload.managed = {
             repoUrl: repoUrl.trim() || undefined,
@@ -536,6 +546,44 @@ function NewSurgeryModal({
                   </select>
                 </label>
               </div>
+
+              <label style={label}>
+                <span>SDK Permission Mode</span>
+                <select
+                  value={permissionMode}
+                  onChange={(e) => {
+                    const m = e.target.value as PermissionMode;
+                    setPermissionMode(m);
+                    if (m === "bypassPermissions") setAllowedTools("");
+                  }}
+                  style={select}
+                >
+                  {PERMISSION_MODES.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} — {m.tag}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {permissionMode === "acceptEdits" && (
+                <label style={label}>
+                  <span>
+                    Auto-allow tools{" "}
+                    <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>
+                      (comma-separated, e.g. Bash,Read,Write)
+                    </span>
+                  </span>
+                  <input
+                    type="text"
+                    value={allowedTools}
+                    onChange={(e) => setAllowedTools(e.target.value)}
+                    placeholder="leave blank to only auto-approve file writes"
+                    spellCheck={false}
+                    style={input}
+                  />
+                </label>
+              )}
 
               <label
                 style={{

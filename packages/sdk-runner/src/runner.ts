@@ -23,7 +23,8 @@ import { THINKING_TOKENS, type ThinkingLevel } from "./args.js";
 
 const ENGINE = "sdk" as const;
 
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+const WATCHDOG_INTERVAL_MS = 30_000;
 
 export class SdkSessionError extends Error {
   constructor(
@@ -52,6 +53,10 @@ export interface RunOptions {
   thinking?: ThinkingLevel;
   /** Run `git add -A && git commit --allow-empty` after each phase completes. */
   commitPerPhase?: boolean;
+  /** SDK permission mode. Defaults to "acceptEdits". */
+  permissionMode?: "acceptEdits" | "bypassPermissions";
+  /** Tool names to auto-allow without prompting. */
+  allowedTools?: string[];
   /** Injected for tests; defaults to a thin wrapper around execSync. */
   git?: GitExec;
 }
@@ -90,6 +95,9 @@ interface PhaseContext {
   bashCommands: Map<string, string>;
   // fingerprint of last seen coverage snapshot, so we don't re-emit identical deltas.
   lastCoverageKey: string | null;
+  // tool_use_id -> tool_name for calls that haven't received a tool_result yet.
+  // Used by the watchdog to emit heartbeat events during long-running tools (e.g. Agent).
+  pendingToolCalls: Map<string, string>;
 }
 
 export async function runPipeline(opts: RunOptions): Promise<void> {
@@ -149,7 +157,7 @@ export function markActivePhaseFailedSync(reason: string): void {
 
 async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
   const startedAt = Date.now();
-  const ctx: PhaseContext = { bashCommands: new Map(), lastCoverageKey: null };
+  const ctx: PhaseContext = { bashCommands: new Map(), lastCoverageKey: null, pendingToolCalls: new Map() };
   activePhase = { phase, opts };
 
   await emit(opts, {
@@ -256,7 +264,10 @@ async function streamQuery(
     prompt,
     options: {
       cwd: opts.repoRoot,
-      permissionMode: "acceptEdits",
+      permissionMode: opts.permissionMode ?? "acceptEdits",
+      ...(opts.allowedTools && opts.allowedTools.length > 0
+        ? { allowedTools: opts.allowedTools }
+        : {}),
       ...(opts.model ? { model: opts.model } : {}),
       ...(typeof thinkingTokens === "number" && thinkingTokens > 0
         ? { maxThinkingTokens: thinkingTokens }
@@ -271,11 +282,25 @@ async function streamQuery(
   let lastActivity = Date.now();
   let watchdogFired = false;
   const watchdog = setInterval(() => {
-    if (Date.now() - lastActivity > INACTIVITY_TIMEOUT_MS) {
+    const idleMs = Date.now() - lastActivity;
+    if (idleMs > INACTIVITY_TIMEOUT_MS) {
       watchdogFired = true;
       iterator.return?.(undefined);
+      return;
     }
-  }, 30_000);
+    // Emit a heartbeat ToolUse for each tool call that is still pending (no
+    // tool_result received yet). This keeps the JSONL and UI alive during
+    // long-running sub-agent invocations where the iterator is otherwise silent.
+    for (const [, toolName] of ctx.pendingToolCalls) {
+      void emit(opts, {
+        ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
+        type: "ToolUse",
+        tool: toolName,
+        summary: `still running… (${Math.round(idleMs / 1000)}s elapsed)`,
+        blocked: false,
+      });
+    }
+  }, WATCHDOG_INTERVAL_MS);
 
   try {
     while (true) {
@@ -302,7 +327,20 @@ async function onMessage(
 
   // Terminal SDK signal. `success` = clean end. Any `error_*` subtype means
   // the SDK already exhausted its retries — surface as a phase failure.
+  // Emit a blocked ToolUse event for each permission denial so the UI can
+  // surface them.
   if (anyMsg.type === "result") {
+    const denials: { tool_name?: string; tool_input?: Record<string, unknown> }[] =
+      Array.isArray(anyMsg.permission_denials) ? anyMsg.permission_denials : [];
+    for (const d of denials) {
+      await emit(opts, {
+        ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
+        type: "ToolUse",
+        tool: d.tool_name ?? "unknown",
+        summary: summarizeToolInput(d.tool_name ?? "", d.tool_input ?? {}),
+        blocked: true,
+      });
+    }
     if (typeof anyMsg.subtype === "string" && anyMsg.subtype.startsWith("error_")) {
       throw new SdkSessionError(anyMsg.subtype, anyMsg);
     }
@@ -320,6 +358,7 @@ async function onMessage(
   if (anyMsg.type === "assistant" && anyMsg.message?.content) {
     for (const block of anyMsg.message.content) {
       if (block.type === "tool_use") {
+        if (block.id) ctx.pendingToolCalls.set(block.id, block.name);
         await emit(opts, {
           ...makeBaseEvent({ phase, engine: ENGINE, runId: opts.runId }),
           type: "ToolUse",
@@ -343,6 +382,7 @@ async function onMessage(
     for (const block of anyMsg.message.content) {
       if (block.type !== "tool_result") continue;
       const toolUseId: string | undefined = block.tool_use_id;
+      if (toolUseId) ctx.pendingToolCalls.delete(toolUseId);
       const cmd = toolUseId ? ctx.bashCommands.get(toolUseId) : undefined;
       if (!cmd || !isTestCommand(cmd)) continue;
 
