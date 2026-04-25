@@ -4,6 +4,8 @@ import { parseArgs, HELP, defaultScratchBranch } from "./args.js";
 import { resolveRepoUrl, resolveBaseBranch } from "./git-context.js";
 import { resolveGithubToken, resolveAgentEnvId } from "./secrets.js";
 import { bootstrapFinishSession } from "./session.js";
+import { drainSessionStream } from "./runner.js";
+import type { ManagedEvent } from "./sse-translator.js";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -75,9 +77,45 @@ async function main(): Promise<void> {
   console.log(
     `[managed-runner] agentId=${result.agentId}${result.agentCached ? " (cached)" : " (new)"}`,
   );
+  console.log("[managed-runner] streaming session events…");
+
+  const stream = await client.beta.sessions.events.stream(result.sessionId);
+  // The Anthropic SDK's `Stream<T>` yields a `BetaManagedAgentsStreamSessionEvents`
+  // which carries the actual session event in a discriminated `event` field.
+  // Our translator works on the inner ManagedEvent shape; coerce here so the
+  // pure code stays decoupled from the SDK's wrapper type.
+  async function* unwrap(): AsyncIterable<ManagedEvent> {
+    for await (const wrapper of stream) {
+      const inner = (wrapper as unknown as { event?: ManagedEvent }).event;
+      if (inner) yield inner;
+      else yield wrapper as unknown as ManagedEvent;
+    }
+  }
+
+  const drainResult = await drainSessionStream({
+    stream: unwrap(),
+    repoRoot: args.repoRoot,
+    runId: args.runId,
+    scratchBranch,
+    heartbeatMs: 10_000,
+    onLog: (line) => console.log(line),
+  });
+
   console.log(
-    "[managed-runner] session opened and kick-off message sent. Streaming will be wired in task #7.",
+    `[managed-runner] done control=${drainResult.control.kind} events=${drainResult.eventsAppended} artifacts=${drainResult.artifactsWritten} dups=${drainResult.duplicatesSkipped}`,
   );
+  if (drainResult.control.kind === "failed") {
+    console.error(
+      `[managed-runner] failed: ${"reason" in drainResult.control ? drainResult.control.reason : ""}`,
+    );
+    process.exit(1);
+  }
+  if (drainResult.control.kind === "aborted") {
+    console.error(
+      `[managed-runner] aborted: ${"reason" in drainResult.control ? drainResult.control.reason : ""}`,
+    );
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

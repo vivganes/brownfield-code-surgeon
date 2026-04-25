@@ -22,3 +22,26 @@ export {
   type SessionBootstrapArgs,
   type SessionBootstrapResult,
 } from "./session.js";
+export {
+  translateEvent,
+  extractArtifactWrites,
+  normalizeScaffoldPath,
+  type ManagedEvent,
+  type TranslateContext,
+  type TranslateResult,
+  type ArtifactWrite,
+  type StreamControl,
+} from "./sse-translator.js";
+export { applyArtifactWrite, type ApplyResult } from "./artifact-sync.js";
+export {
+  pullScratchOnce,
+  startHeartbeat,
+  type GitExec,
+  type PullResult,
+  type HeartbeatHandle,
+} from "./heartbeat.js";
+export {
+  drainSessionStream,
+  type DrainArgs,
+  type DrainResult,
+} from "./runner.js";
