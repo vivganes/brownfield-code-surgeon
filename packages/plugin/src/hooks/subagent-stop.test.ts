@@ -102,6 +102,36 @@ describe("subagent-stop run()", () => {
     expect(phaseEnd.durationMs).toBe(3500);
   });
 
+  it("skips commit when vitals.commitPerPhase is false", () => {
+    const v = emptyVitals(tmp);
+    v.currentPhase = "plan";
+    v.phaseStartedAt = { plan: new Date().toISOString() };
+    v.commitPerPhase = false;
+    writeVitals(tmp, v);
+
+    const commit = vi.fn();
+    run({ env, commit });
+    expect(commit).not.toHaveBeenCalled();
+
+    // PhaseEnd / ApprovalRequested still emit normally
+    const evs = events(tmp);
+    expect(evs.find((e) => e.type === "PhaseEnd")).toBeTruthy();
+    expect(evs.find((e) => e.type === "ApprovalRequested")).toBeTruthy();
+  });
+
+  it("commits when vitals.commitPerPhase is missing (legacy vitals.json)", () => {
+    const v = emptyVitals(tmp);
+    v.currentPhase = "plan";
+    v.phaseStartedAt = { plan: new Date().toISOString() };
+    // simulate an older vitals.json with no commitPerPhase field
+    delete (v as Partial<typeof v>).commitPerPhase;
+    writeVitals(tmp, v as typeof v);
+
+    const commit = vi.fn();
+    run({ env, commit });
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
   it("swallows errors from the commit function gracefully (via defaultCommit)", () => {
     // defaultCommit tries execSync; in a non-git tmp dir it should not throw.
     const v = emptyVitals(tmp);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { run } from "./session-start.js";
+import { run, ensureGitignoreEntries } from "./session-start.js";
 import {
   readVitals,
   eventsFile,
@@ -75,6 +75,37 @@ describe("session-start hook", () => {
 
     expect(fs.readFileSync(eventsFile(tmp), "utf8")).toBe(eventsBefore);
     expect(readVitals(tmp)!.runId).toBe(runIdBefore);
+  });
+
+  it("creates .gitignore with plan/ and .surgery/ when missing", () => {
+    run({ env });
+    const body = fs.readFileSync(path.join(tmp, ".gitignore"), "utf8");
+    expect(body).toMatch(/^plan\/$/m);
+    expect(body).toMatch(/^\.surgery\/$/m);
+  });
+
+  it("appends only the missing entries to an existing .gitignore", () => {
+    fs.writeFileSync(path.join(tmp, ".gitignore"), "node_modules\nplan/\n");
+    ensureGitignoreEntries(tmp);
+    const body = fs.readFileSync(path.join(tmp, ".gitignore"), "utf8");
+    expect(body.match(/^plan\/$/gm)?.length).toBe(1);
+    expect(body).toMatch(/^\.surgery\/$/m);
+    expect(body).toMatch(/^node_modules$/m);
+  });
+
+  it("is a no-op when both entries are already present", () => {
+    const original = "plan/\n.surgery/\n";
+    fs.writeFileSync(path.join(tmp, ".gitignore"), original);
+    ensureGitignoreEntries(tmp);
+    expect(fs.readFileSync(path.join(tmp, ".gitignore"), "utf8")).toBe(original);
+  });
+
+  it("adds a leading newline when the existing file lacks a trailing newline", () => {
+    fs.writeFileSync(path.join(tmp, ".gitignore"), "node_modules");
+    ensureGitignoreEntries(tmp);
+    const body = fs.readFileSync(path.join(tmp, ".gitignore"), "utf8");
+    expect(body.startsWith("node_modules\n")).toBe(true);
+    expect(body).toMatch(/plan\//);
   });
 
   it("falls back to 'startup' when input.source is missing", () => {

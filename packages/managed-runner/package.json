@@ -1,0 +1,31 @@
+{
+  "name": "@brownfield-surgeon/managed-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud engine that runs the Finish phase as an Anthropic Managed Agent and syncs artifacts back to the local repo.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "surgery-managed": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf dist",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.0",
+    "@brownfield-surgeon/core-prompts": "*",
+    "@brownfield-surgeon/shared": "*"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.0"
+  }
+}

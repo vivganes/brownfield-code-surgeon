@@ -9,6 +9,7 @@ const BaseEvent = z.object({
   phase: PhaseSchema,
   engine: EngineSchema,
   runId: z.string().min(1),
+  seq: z.number().int().nonnegative().optional(),
 });
 
 export const PhaseStartEvent = BaseEvent.extend({

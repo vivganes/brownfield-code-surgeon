@@ -97,6 +97,7 @@ export interface Vitals {
   seamsFound: number;
   dependenciesBroken: number;
   artifacts: string[];
+  commitPerPhase: boolean;
 }
 
 export function readVitals(repoRoot: string): Vitals | null {
@@ -139,6 +140,7 @@ export function emptyVitals(repoRoot: string): Vitals {
     seamsFound: 0,
     dependenciesBroken: 0,
     artifacts: [],
+    commitPerPhase: true,
   };
 }
 

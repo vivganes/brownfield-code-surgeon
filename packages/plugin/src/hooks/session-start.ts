@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
 import {
   readStdin,
   resolveRepoRoot,
@@ -10,6 +12,34 @@ import {
   baseEvent,
   type HookInput,
 } from "./_lib.js";
+
+const GITIGNORE_ENTRIES = ["plan/", ".surgery/"];
+
+export function ensureGitignoreEntries(repoRoot: string): void {
+  const file = path.join(repoRoot, ".gitignore");
+  let body = "";
+  try {
+    body = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") return;
+  }
+  const lines = body.split(/\r?\n/);
+  const present = new Set(lines.map((l) => l.trim()).filter(Boolean));
+  const missing = GITIGNORE_ENTRIES.filter((e) => !present.has(e));
+  if (missing.length === 0) return;
+
+  const needsLeadingNewline = body.length > 0 && !body.endsWith("\n");
+  const block =
+    (needsLeadingNewline ? "\n" : "") +
+    (body.length > 0 ? "# brownfield-code-surgeon scaffolding\n" : "") +
+    missing.join("\n") +
+    "\n";
+  try {
+    fs.appendFileSync(file, block, "utf8");
+  } catch {
+    // best-effort; never block session start on this
+  }
+}
 
 export interface RunOptions {
   input?: HookInput;
@@ -26,6 +56,7 @@ export function run(opts: RunOptions = {}): RunResult {
   const env = opts.env ?? process.env;
   const repoRoot = resolveRepoRoot(input, env);
   ensureSurgeryDir(repoRoot);
+  ensureGitignoreEntries(repoRoot);
 
   let vitals = readVitals(repoRoot);
   if (!vitals) {

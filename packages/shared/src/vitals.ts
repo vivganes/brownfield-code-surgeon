@@ -49,6 +49,7 @@ export const VitalsSchema = z.object({
   dependenciesBroken: z.number().int().nonnegative().default(0),
   artifacts: z.array(z.string()).default([]),
   baselineRef: z.string().nullable().default(null),
+  commitPerPhase: z.boolean().default(true),
 });
 export type Vitals = z.infer<typeof VitalsSchema>;
 
@@ -80,5 +81,6 @@ export function emptyVitals(args: {
     dependenciesBroken: 0,
     artifacts: [],
     baselineRef: null,
+    commitPerPhase: true,
   };
 }
