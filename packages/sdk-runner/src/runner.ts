@@ -50,10 +50,8 @@ export interface RunOptions {
   autoApprove: boolean;
   model?: string;
   thinking?: ThinkingLevel;
-  /** Run `git add -A && git commit` after each phase completes. */
+  /** Run `git add -A && git commit --allow-empty` after each phase completes. */
   commitPerPhase?: boolean;
-  /** When set, run `git push origin HEAD:<branch>` after each commit. */
-  pushTo?: string;
   /** Injected for tests; defaults to a thin wrapper around execSync. */
   git?: GitExec;
 }
@@ -64,25 +62,26 @@ const defaultGit: GitExec = (cmd, cwd) => {
   execSync(cmd, { cwd, stdio: "ignore" });
 };
 
-export function commitAndPush(
+/**
+ * Run `git add -A && git commit --allow-empty` for the given phase. We
+ * deliberately do NOT push here: pushing is the orchestrator's concern, run
+ * once at the end of the local stage rather than after every phase. Empty
+ * commits stay allowed so the per-phase audit trail is linear even when a
+ * phase only touched gitignored scaffolding.
+ */
+export function commitPhase(
   repoRoot: string,
   phase: Phase,
   runId: string,
-  pushTo: string | undefined,
   git: GitExec = defaultGit,
 ): void {
   try {
     git("git add -A", repoRoot);
     const msg = `surgery(${phase}): phase complete [${runId}]`;
-    // Allow empty-on-purpose commits so the chain stays linear even when a
-    // phase only changes gitignored scaffolding.
     git(`git commit --allow-empty -m ${JSON.stringify(msg)}`, repoRoot);
-    if (pushTo) {
-      git(`git push -u origin HEAD:${pushTo}`, repoRoot);
-    }
   } catch (err) {
     // Non-fatal: the run continues. The error surfaces in stderr via execSync.
-    console.warn(`[sdk-runner] commit/push for "${phase}" failed: ${String(err)}`);
+    console.warn(`[sdk-runner] commit for "${phase}" failed: ${String(err)}`);
   }
 }
 
@@ -204,8 +203,8 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
       durationMs: Date.now() - startedAt,
     });
 
-    if (opts.commitPerPhase || opts.pushTo) {
-      commitAndPush(opts.repoRoot, phase, opts.runId, opts.pushTo, opts.git);
+    if (opts.commitPerPhase) {
+      commitPhase(opts.repoRoot, phase, opts.runId, opts.git);
     }
   } catch (err) {
     await setPhaseStatus(opts.repoRoot, phase, "failed");

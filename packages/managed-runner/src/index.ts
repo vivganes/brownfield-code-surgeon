@@ -1,5 +1,9 @@
 export { parseArgs, HELP, defaultScratchBranch, type CliArgs } from "./args.js";
-export { resolveRepoUrl, resolveBaseBranch } from "./git-context.js";
+export {
+  resolveRepoUrl,
+  resolveBaseBranch,
+  resolveCurrentBranch,
+} from "./git-context.js";
 export {
   readSecrets,
   writeSecrets,

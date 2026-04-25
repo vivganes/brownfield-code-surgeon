@@ -133,13 +133,13 @@ export function buildKickoffPrompt(args: {
   if (args.request) lines.push(`Original surgery request: ${args.request}`);
   lines.push(`Working tree: /workspace/repo`);
   lines.push(`Base branch: ${args.baseBranch}`);
-  lines.push(`Scratch branch (your work goes here): ${args.scratchBranch}`);
+  lines.push(`Working branch (your commits land here): ${args.scratchBranch}`);
   lines.push(`Checked out branch on entry: ${checkoutBranch}`);
   lines.push("");
 
   if (resuming) {
     lines.push(
-      "Phases 1–6 (plan, map, break, cover, implement, refactor) have already been completed locally. Their commits are on the scratch branch you're checked out on. Your job is the Finish phase only — verify the implementation, finalize, and push.",
+      `Phases 1–6 (plan, map, break, cover, implement, refactor) have already been completed locally and pushed to \`${args.scratchBranch}\` on origin. You're checked out on that branch — its tip is the result of phase 6. Your job is the Finish phase only: verify the implementation, finalize, and push your commits back to the same branch.`,
     );
   } else {
     lines.push(
@@ -186,7 +186,7 @@ export function buildKickoffPrompt(args: {
     "  - Stage and commit any remaining changes with a clear summary message.",
   );
   lines.push(
-    `  - Push the scratch branch: \`git push -u origin ${args.scratchBranch}\`.`,
+    `  - Push your work back: \`git push -u origin ${args.scratchBranch}\`.`,
   );
   lines.push(
     "  - End your turn. The local runner will pull your work and surface the diff.",

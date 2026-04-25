@@ -1,8 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { __testing } from "./run-manager.js";
 
-const { planSdkRunner, planManagedRunner, planChain, defaultScratchBranch } =
-  __testing;
+const {
+  planSdkRunner,
+  planManagedRunner,
+  planChain,
+  defaultScratchBranch,
+  resolveHandoffBranch,
+  pushBranchOnce,
+} = __testing;
 
 describe("planSdkRunner", () => {
   it("targets dist/cli.js in the sdk-runner package", () => {
@@ -140,7 +146,7 @@ describe("planChain", () => {
     expect(runId).toBe("r-fixed");
   });
 
-  it("stage 1 (sdk) runs only phases 1-6 with commit-per-phase + push-to scratch", () => {
+  it("stage 1 (sdk) runs only phases 1-6 with commit-per-phase, no push", () => {
     const { plans } = planChain({
       repoRoot: "/work",
       request: "x",
@@ -153,12 +159,31 @@ describe("planChain", () => {
     const phasesIdx = sdk.indexOf("--phases");
     expect(sdk[phasesIdx + 1]).toBe("plan,map,break,cover,implement,refactor");
     expect(sdk).toContain("--commit-per-phase");
-    expect(sdk).toContain("--push-to");
-    expect(sdk).toContain(defaultScratchBranch("r-1"));
+    // pushing is the orchestrator's job, not sdk-runner's
+    expect(sdk).not.toContain("--push-to");
   });
 
-  it("stage 2 (managed) is told to check out the scratch branch", () => {
-    const { plans } = planChain({
+  it("returns a handoffBranch for engine=managed and none for engine=sdk", () => {
+    const managed = planChain({
+      repoRoot: "/work",
+      request: "x",
+      engine: "managed",
+      runId: "r-1",
+      managed: { agentEnvId: "env_abc" },
+    });
+    expect(managed.handoffBranch).toBe(defaultScratchBranch("r-1"));
+
+    const sdk = planChain({
+      repoRoot: "/work",
+      request: "x",
+      engine: "sdk",
+      runId: "r-1",
+    });
+    expect(sdk.handoffBranch).toBeUndefined();
+  });
+
+  it("stage 2 (managed) is told to check out the handoff branch", () => {
+    const { plans, handoffBranch } = planChain({
       repoRoot: "/work",
       request: "x",
       engine: "managed",
@@ -168,14 +193,14 @@ describe("planChain", () => {
     const managed = plans[1]!.cliArgs;
     expect(managed).toContain("--checkout-branch");
     const idx = managed.indexOf("--checkout-branch");
-    expect(managed[idx + 1]).toBe(defaultScratchBranch("r-1"));
+    expect(managed[idx + 1]).toBe(handoffBranch);
     // Both stages share the same runId.
     expect(managed).toContain("--run-id");
     expect(managed).toContain("r-1");
   });
 
-  it("respects an explicit managed.scratchBranch override across both stages", () => {
-    const { plans } = planChain({
+  it("respects an explicit managed.scratchBranch override on stage 2 + handoff", () => {
+    const { plans, handoffBranch } = planChain({
       repoRoot: "/work",
       request: "x",
       engine: "managed",
@@ -185,7 +210,7 @@ describe("planChain", () => {
         scratchBranch: "custom/branch",
       },
     });
-    expect(plans[0]!.cliArgs).toContain("custom/branch");
+    expect(handoffBranch).toBe("custom/branch");
     expect(plans[1]!.cliArgs).toContain("custom/branch");
   });
 
@@ -202,5 +227,59 @@ describe("planChain", () => {
     expect(() =>
       planChain({ repoRoot: "/work", request: "x", engine: "plugin" }),
     ).toThrow(/plugin/);
+  });
+});
+
+describe("pushBranchOnce", () => {
+  it("refuses unsafe branch names without invoking git", () => {
+    const lines: string[] = [];
+    const ok = pushBranchOnce("/repo", "good; rm -rf /", (l) => lines.push(l));
+    expect(ok).toBe(false);
+    expect(lines.join("\n")).toMatch(/refusing unsafe branch name/);
+  });
+
+  it("returns false and logs when git push fails", () => {
+    const lines: string[] = [];
+    // Non-repo path → git push will fail.
+    const ok = pushBranchOnce(
+      process.platform === "win32" ? "C:\\nonexistent-runmgr-repo" : "/nonexistent-runmgr-repo",
+      "feature/x",
+      (l) => lines.push(l),
+    );
+    expect(ok).toBe(false);
+    expect(lines.some((l) => l.includes("push failed"))).toBe(true);
+  });
+});
+
+describe("resolveHandoffBranch", () => {
+  it("returns the explicit override even when a current branch exists", () => {
+    expect(
+      resolveHandoffBranch({
+        repoRoot: "/work",
+        runId: "r-1",
+        override: "custom/branch",
+        resolve: () => "feature/x",
+      }),
+    ).toBe("custom/branch");
+  });
+
+  it("uses the resolved current branch when no override is provided", () => {
+    expect(
+      resolveHandoffBranch({
+        repoRoot: "/work",
+        runId: "r-1",
+        resolve: () => "feature/comments",
+      }),
+    ).toBe("feature/comments");
+  });
+
+  it("falls back to surgery/<runId>/finish when no current branch is available", () => {
+    expect(
+      resolveHandoffBranch({
+        repoRoot: "/work",
+        runId: "r-1",
+        resolve: () => undefined,
+      }),
+    ).toBe(defaultScratchBranch("r-1"));
   });
 });

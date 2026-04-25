@@ -20,7 +20,6 @@ export interface CliArgs {
   model?: string;
   thinking?: ThinkingLevel;
   commitPerPhase: boolean;
-  pushTo?: string;
 }
 
 const HELP = `surgery-run — Brownfield Code Surgeon SDK runner
@@ -37,9 +36,9 @@ Options:
   --run-id <id>         Override the generated run identifier
   --model <id>          Claude model ID (e.g. claude-opus-4-7)
   --thinking <level>    Extended-thinking effort: off|low|medium|high
-  --commit-per-phase    Run \`git add -A && git commit\` after each phase
-  --push-to <branch>    Run \`git push origin HEAD:<branch>\` after each commit
-                        (implies --commit-per-phase)
+  --commit-per-phase    Run \`git add -A && git commit\` after each phase.
+                        The orchestrator (run-manager) is responsible for
+                        any single push at the end of the run.
   -h, --help            Show this help
 `;
 
@@ -86,10 +85,6 @@ export function parseArgs(argv: string[]): CliArgs {
       }
       case "--commit-per-phase":
         args.commitPerPhase = true;
-        break;
-      case "--push-to":
-        args.pushTo = argv[++i];
-        if (args.pushTo) args.commitPerPhase = true;
         break;
       case "-h":
       case "--help":

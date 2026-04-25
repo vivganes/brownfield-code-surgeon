@@ -19,6 +19,25 @@ export function resolveRepoUrl(repoRoot: string): string | undefined {
 }
 
 /**
+ * Returns the name of the currently checked-out branch, or undefined for
+ * detached HEAD / non-repo / no commits.
+ */
+export function resolveCurrentBranch(repoRoot: string): string | undefined {
+  try {
+    const out = execSync("git rev-parse --abbrev-ref HEAD", {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+    if (!out || out === "HEAD") return undefined; // HEAD = detached
+    return out;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Returns the default base branch (e.g. "main") by resolving `origin/HEAD`.
  * Falls back to "main" when origin/HEAD is unset.
  */

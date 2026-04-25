@@ -170,7 +170,6 @@ describe("parseArgs", () => {
   it("commitPerPhase defaults to false", () => {
     const args = parseArgs(["--repo", ".", "--request", "x"]);
     expect(args.commitPerPhase).toBe(false);
-    expect(args.pushTo).toBeUndefined();
   });
 
   it("parses --commit-per-phase", () => {
@@ -178,17 +177,10 @@ describe("parseArgs", () => {
     expect(args.commitPerPhase).toBe(true);
   });
 
-  it("parses --push-to and implicitly enables commit-per-phase", () => {
-    const args = parseArgs([
-      "--repo",
-      ".",
-      "--request",
-      "x",
-      "--push-to",
-      "surgery/r-1/finish",
-    ]);
-    expect(args.pushTo).toBe("surgery/r-1/finish");
-    expect(args.commitPerPhase).toBe(true);
+  it("rejects --push-to (removed; the orchestrator handles pushing)", () => {
+    expect(() =>
+      parseArgs(["--repo", ".", "--request", "x", "--push-to", "x"]),
+    ).toThrow(/unknown flag: --push-to/);
   });
 });
 

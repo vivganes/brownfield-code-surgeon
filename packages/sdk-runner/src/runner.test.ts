@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RunOptions } from "./runner.js";
 import type { Phase } from "@brownfield-surgeon/shared";
-import { buildPhasePrompt, commitAndPush } from "./runner.js";
+import { buildPhasePrompt, commitPhase } from "./runner.js";
 
-describe("commitAndPush", () => {
-  it("runs add + commit when pushTo is undefined", () => {
+describe("commitPhase", () => {
+  it("runs git add -A then git commit --allow-empty with the phase tag", () => {
     const calls: string[] = [];
-    commitAndPush("/repo", "plan", "r-1", undefined, (cmd) => {
+    commitPhase("/repo", "plan", "r-1", (cmd) => {
       calls.push(cmd);
     });
     expect(calls[0]).toBe("git add -A");
@@ -15,17 +15,17 @@ describe("commitAndPush", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("appends git push HEAD:<branch> when pushTo is set", () => {
+  it("never invokes git push (push is the orchestrator's job)", () => {
     const calls: string[] = [];
-    commitAndPush("/repo", "implement", "r-2", "surgery/r-2/finish", (cmd) => {
+    commitPhase("/repo", "implement", "r-2", (cmd) => {
       calls.push(cmd);
     });
-    expect(calls[2]).toBe("git push -u origin HEAD:surgery/r-2/finish");
+    expect(calls.find((c) => c.startsWith("git push"))).toBeUndefined();
   });
 
   it("uses --allow-empty so phases that only touch gitignored files still commit", () => {
     const calls: string[] = [];
-    commitAndPush("/repo", "plan", "r-1", undefined, (cmd) => {
+    commitPhase("/repo", "plan", "r-1", (cmd) => {
       calls.push(cmd);
     });
     expect(calls[1]).toContain("--allow-empty");
@@ -33,21 +33,10 @@ describe("commitAndPush", () => {
 
   it("swallows git failures (non-fatal to the run)", () => {
     expect(() =>
-      commitAndPush("/repo", "plan", "r-1", undefined, () => {
+      commitPhase("/repo", "plan", "r-1", () => {
         throw new Error("not a git repo");
       }),
     ).not.toThrow();
-  });
-
-  it("does not push if commit fails", () => {
-    const calls: string[] = [];
-    expect(() =>
-      commitAndPush("/repo", "plan", "r-1", "surgery/r-1/finish", (cmd) => {
-        calls.push(cmd);
-        if (cmd.startsWith("git commit")) throw new Error("nothing to commit");
-      }),
-    ).not.toThrow();
-    expect(calls.find((c) => c.startsWith("git push"))).toBeUndefined();
   });
 });
 
