@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import path from "node:path";
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
@@ -49,6 +50,40 @@ export interface RunOptions {
   autoApprove: boolean;
   model?: string;
   thinking?: ThinkingLevel;
+  /** Run `git add -A && git commit` after each phase completes. */
+  commitPerPhase?: boolean;
+  /** When set, run `git push origin HEAD:<branch>` after each commit. */
+  pushTo?: string;
+  /** Injected for tests; defaults to a thin wrapper around execSync. */
+  git?: GitExec;
+}
+
+export type GitExec = (cmd: string, cwd: string) => void;
+
+const defaultGit: GitExec = (cmd, cwd) => {
+  execSync(cmd, { cwd, stdio: "ignore" });
+};
+
+export function commitAndPush(
+  repoRoot: string,
+  phase: Phase,
+  runId: string,
+  pushTo: string | undefined,
+  git: GitExec = defaultGit,
+): void {
+  try {
+    git("git add -A", repoRoot);
+    const msg = `surgery(${phase}): phase complete [${runId}]`;
+    // Allow empty-on-purpose commits so the chain stays linear even when a
+    // phase only changes gitignored scaffolding.
+    git(`git commit --allow-empty -m ${JSON.stringify(msg)}`, repoRoot);
+    if (pushTo) {
+      git(`git push -u origin HEAD:${pushTo}`, repoRoot);
+    }
+  } catch (err) {
+    // Non-fatal: the run continues. The error surfaces in stderr via execSync.
+    console.warn(`[sdk-runner] commit/push for "${phase}" failed: ${String(err)}`);
+  }
 }
 
 interface PhaseContext {
@@ -168,6 +203,10 @@ async function runPhase(phase: Phase, opts: RunOptions): Promise<void> {
       outcome: "completed",
       durationMs: Date.now() - startedAt,
     });
+
+    if (opts.commitPerPhase || opts.pushTo) {
+      commitAndPush(opts.repoRoot, phase, opts.runId, opts.pushTo, opts.git);
+    }
   } catch (err) {
     await setPhaseStatus(opts.repoRoot, phase, "failed");
     await emit(opts, {

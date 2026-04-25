@@ -166,6 +166,30 @@ describe("parseArgs", () => {
     const args = parseArgs(["--repo", ".", "--request", request]);
     expect(args.request).toBe(request);
   });
+
+  it("commitPerPhase defaults to false", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x"]);
+    expect(args.commitPerPhase).toBe(false);
+    expect(args.pushTo).toBeUndefined();
+  });
+
+  it("parses --commit-per-phase", () => {
+    const args = parseArgs(["--repo", ".", "--request", "x", "--commit-per-phase"]);
+    expect(args.commitPerPhase).toBe(true);
+  });
+
+  it("parses --push-to and implicitly enables commit-per-phase", () => {
+    const args = parseArgs([
+      "--repo",
+      ".",
+      "--request",
+      "x",
+      "--push-to",
+      "surgery/r-1/finish",
+    ]);
+    expect(args.pushTo).toBe("surgery/r-1/finish");
+    expect(args.commitPerPhase).toBe(true);
+  });
 });
 
 describe("THINKING_TOKENS", () => {

@@ -41,4 +41,13 @@ describe("parseArgs", () => {
   it("defaultScratchBranch follows surgery/<runId>/finish", () => {
     expect(defaultScratchBranch("r-1")).toBe("surgery/r-1/finish");
   });
+
+  it("parses --checkout-branch", () => {
+    const args = parseArgs(["--checkout-branch", "surgery/r-1/finish"]);
+    expect(args.checkoutBranch).toBe("surgery/r-1/finish");
+  });
+
+  it("checkoutBranch is undefined when not provided", () => {
+    expect(parseArgs([]).checkoutBranch).toBeUndefined();
+  });
 });

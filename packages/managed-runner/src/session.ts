@@ -2,6 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { loadPrompt } from "@brownfield-surgeon/core-prompts";
 import { resolveAgentId, type CreateAgentFn } from "./agent-cache.js";
 
+export interface AttachedFile {
+  /** Repo-relative path the cloud agent will see in its prompt. */
+  path: string;
+  content: string;
+}
+
 export interface SessionBootstrapArgs {
   client: Anthropic;
   model: string;
@@ -10,9 +16,21 @@ export interface SessionBootstrapArgs {
   repoUrl: string;
   baseBranch: string;
   scratchBranch: string;
+  /**
+   * Branch the cloud container should clone+checkout. Defaults to baseBranch.
+   * Pass scratchBranch when phases 1–6 already pushed there.
+   */
+  checkoutBranch?: string;
   githubToken: string;
   runId: string;
   request?: string;
+  /**
+   * Files to embed in the kickoff prompt as fenced code blocks. Used to give
+   * the cloud Finish agent visibility into local-only methodology files
+   * (plan/plan.md, plan/seams-and-dependencies.md) that don't reach the
+   * cloud via git because they're gitignored.
+   */
+  attachedFiles?: AttachedFile[];
   /**
    * Optional override for the system prompt. Defaults to the contents of
    * 7-finish.agent.md from @brownfield-surgeon/core-prompts.
@@ -62,6 +80,7 @@ export async function bootstrapFinishSession(
     createAgent,
   });
 
+  const checkoutBranch = args.checkoutBranch ?? args.baseBranch;
   const session = await args.client.beta.sessions.create({
     agent: agentId,
     environment_id: args.environmentId,
@@ -76,7 +95,7 @@ export async function bootstrapFinishSession(
         type: "github_repository",
         url: args.repoUrl,
         authorization_token: args.githubToken,
-        checkout: { type: "branch", name: args.baseBranch },
+        checkout: { type: "branch", name: checkoutBranch },
         mount_path: "/workspace/repo",
       },
     ],
@@ -97,9 +116,14 @@ export async function bootstrapFinishSession(
 export function buildKickoffPrompt(args: {
   scratchBranch: string;
   baseBranch: string;
+  checkoutBranch?: string;
   runId: string;
   request?: string;
+  attachedFiles?: AttachedFile[];
 }): string {
+  const checkoutBranch = args.checkoutBranch ?? args.baseBranch;
+  const resuming = checkoutBranch === args.scratchBranch;
+
   const lines: string[] = [];
   lines.push(
     "You are the Finish phase of a brownfield code-surgery run. Follow the system prompt — your operating instructions are the Finish phase agent prompt.",
@@ -110,11 +134,49 @@ export function buildKickoffPrompt(args: {
   lines.push(`Working tree: /workspace/repo`);
   lines.push(`Base branch: ${args.baseBranch}`);
   lines.push(`Scratch branch (your work goes here): ${args.scratchBranch}`);
+  lines.push(`Checked out branch on entry: ${checkoutBranch}`);
   lines.push("");
+
+  if (resuming) {
+    lines.push(
+      "Phases 1–6 (plan, map, break, cover, implement, refactor) have already been completed locally. Their commits are on the scratch branch you're checked out on. Your job is the Finish phase only — verify the implementation, finalize, and push.",
+    );
+  } else {
+    lines.push(
+      "This is a fresh run on the base branch. You will own all phases of the surgery, ending with the Finish phase.",
+    );
+  }
+  lines.push("");
+
+  if (args.attachedFiles && args.attachedFiles.length > 0) {
+    lines.push("---");
+    lines.push("");
+    lines.push(
+      "Local-only methodology files from earlier phases (these are gitignored, so they aren't on the scratch branch — read them here):",
+    );
+    lines.push("");
+    for (const f of args.attachedFiles) {
+      lines.push(`### ${f.path}`);
+      lines.push("");
+      lines.push("```");
+      lines.push(f.content.replace(/```/g, "``​`")); // defang inner fences
+      lines.push("```");
+      lines.push("");
+    }
+    lines.push("---");
+    lines.push("");
+  }
+
   lines.push("Before you start coding:");
-  lines.push(
-    `  1. \`cd /workspace/repo && git checkout -B ${args.scratchBranch}\`. The base branch is already checked out for you.`,
-  );
+  if (resuming) {
+    lines.push(
+      `  1. You are already on \`${args.scratchBranch}\`. Confirm with \`git status\`.`,
+    );
+  } else {
+    lines.push(
+      `  1. \`cd /workspace/repo && git checkout -B ${args.scratchBranch}\`. The base branch is already checked out for you.`,
+    );
+  }
   lines.push(
     "  2. Configure git identity: `git config user.email \"surgeon@brownfield.local\" && git config user.name \"Brownfield Surgeon\"`.",
   );

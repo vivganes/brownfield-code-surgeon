@@ -1,7 +1,55 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RunOptions } from "./runner.js";
 import type { Phase } from "@brownfield-surgeon/shared";
-import { buildPhasePrompt } from "./runner.js";
+import { buildPhasePrompt, commitAndPush } from "./runner.js";
+
+describe("commitAndPush", () => {
+  it("runs add + commit when pushTo is undefined", () => {
+    const calls: string[] = [];
+    commitAndPush("/repo", "plan", "r-1", undefined, (cmd) => {
+      calls.push(cmd);
+    });
+    expect(calls[0]).toBe("git add -A");
+    expect(calls[1]).toMatch(/^git commit --allow-empty -m /);
+    expect(calls[1]).toContain("surgery(plan): phase complete [r-1]");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("appends git push HEAD:<branch> when pushTo is set", () => {
+    const calls: string[] = [];
+    commitAndPush("/repo", "implement", "r-2", "surgery/r-2/finish", (cmd) => {
+      calls.push(cmd);
+    });
+    expect(calls[2]).toBe("git push -u origin HEAD:surgery/r-2/finish");
+  });
+
+  it("uses --allow-empty so phases that only touch gitignored files still commit", () => {
+    const calls: string[] = [];
+    commitAndPush("/repo", "plan", "r-1", undefined, (cmd) => {
+      calls.push(cmd);
+    });
+    expect(calls[1]).toContain("--allow-empty");
+  });
+
+  it("swallows git failures (non-fatal to the run)", () => {
+    expect(() =>
+      commitAndPush("/repo", "plan", "r-1", undefined, () => {
+        throw new Error("not a git repo");
+      }),
+    ).not.toThrow();
+  });
+
+  it("does not push if commit fails", () => {
+    const calls: string[] = [];
+    expect(() =>
+      commitAndPush("/repo", "plan", "r-1", "surgery/r-1/finish", (cmd) => {
+        calls.push(cmd);
+        if (cmd.startsWith("git commit")) throw new Error("nothing to commit");
+      }),
+    ).not.toThrow();
+    expect(calls.find((c) => c.startsWith("git push"))).toBeUndefined();
+  });
+});
 
 describe("runner", () => {
   beforeEach(() => {

@@ -1,11 +1,31 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseArgs, HELP, defaultScratchBranch } from "./args.js";
 import { resolveRepoUrl, resolveBaseBranch } from "./git-context.js";
 import { resolveGithubToken, resolveAgentEnvId } from "./secrets.js";
-import { bootstrapFinishSession } from "./session.js";
+import { bootstrapFinishSession, type AttachedFile } from "./session.js";
 import { drainSessionStream } from "./runner.js";
 import type { ManagedEvent } from "./sse-translator.js";
+
+const ATTACH_PATHS = [
+  "plan/plan.md",
+  "plan/seams-and-dependencies.md",
+];
+
+function readAttachedFiles(repoRoot: string): AttachedFile[] {
+  const out: AttachedFile[] = [];
+  for (const rel of ATTACH_PATHS) {
+    try {
+      const content = fs.readFileSync(path.join(repoRoot, rel), "utf8");
+      out.push({ path: rel, content });
+    } catch {
+      // file isn't there — that's fine for fresh runs
+    }
+  }
+  return out;
+}
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -17,9 +37,11 @@ async function main(): Promise<void> {
   const repoUrl = args.repoUrl ?? resolveRepoUrl(args.repoRoot);
   const baseBranch = args.baseBranch ?? resolveBaseBranch(args.repoRoot);
   const scratchBranch = args.scratchBranch ?? defaultScratchBranch(args.runId);
+  const checkoutBranch = args.checkoutBranch ?? baseBranch;
   const githubToken = resolveGithubToken();
   const environmentId = resolveAgentEnvId(args.agentEnvId);
   const model = args.model ?? "claude-opus-4-7";
+  const attachedFiles = readAttachedFiles(args.repoRoot);
 
   if (!repoUrl) {
     console.error(
@@ -33,6 +55,10 @@ async function main(): Promise<void> {
   console.log(`[managed-runner] repoUrl=${repoUrl}`);
   console.log(`[managed-runner] baseBranch=${baseBranch}`);
   console.log(`[managed-runner] scratchBranch=${scratchBranch}`);
+  console.log(`[managed-runner] checkoutBranch=${checkoutBranch}`);
+  console.log(
+    `[managed-runner] attachedFiles=${attachedFiles.length > 0 ? attachedFiles.map((f) => f.path).join(",") : "(none)"}`,
+  );
   console.log(`[managed-runner] model=${model}`);
   console.log(
     `[managed-runner] envId=${environmentId ? environmentId : "(missing)"}`,
@@ -68,9 +94,11 @@ async function main(): Promise<void> {
     repoUrl,
     baseBranch,
     scratchBranch,
+    checkoutBranch,
     githubToken,
     runId: args.runId,
     request: args.request,
+    attachedFiles,
   });
 
   console.log(`[managed-runner] sessionId=${result.sessionId}`);

@@ -19,6 +19,8 @@ export interface CliArgs {
   help: boolean;
   model?: string;
   thinking?: ThinkingLevel;
+  commitPerPhase: boolean;
+  pushTo?: string;
 }
 
 const HELP = `surgery-run — Brownfield Code Surgeon SDK runner
@@ -35,6 +37,9 @@ Options:
   --run-id <id>         Override the generated run identifier
   --model <id>          Claude model ID (e.g. claude-opus-4-7)
   --thinking <level>    Extended-thinking effort: off|low|medium|high
+  --commit-per-phase    Run \`git add -A && git commit\` after each phase
+  --push-to <branch>    Run \`git push origin HEAD:<branch>\` after each commit
+                        (implies --commit-per-phase)
   -h, --help            Show this help
 `;
 
@@ -46,6 +51,7 @@ export function parseArgs(argv: string[]): CliArgs {
     autoApprove: false,
     runId: `run-${Date.now().toString(36)}`,
     help: false,
+    commitPerPhase: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -78,6 +84,13 @@ export function parseArgs(argv: string[]): CliArgs {
         args.thinking = v as ThinkingLevel;
         break;
       }
+      case "--commit-per-phase":
+        args.commitPerPhase = true;
+        break;
+      case "--push-to":
+        args.pushTo = argv[++i];
+        if (args.pushTo) args.commitPerPhase = true;
+        break;
       case "-h":
       case "--help":
         args.help = true;

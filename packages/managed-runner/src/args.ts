@@ -6,6 +6,12 @@ export interface CliArgs {
   repoUrl?: string;
   baseBranch?: string;
   scratchBranch?: string;
+  /**
+   * Branch the cloud container should `git checkout` after cloning. Defaults
+   * to `--base-branch`. The chained dispatch from run-manager passes the
+   * scratch branch here so the cloud session resumes on top of phases 1–6.
+   */
+  checkoutBranch?: string;
   request?: string;
   agentEnvId?: string;
   model?: string;
@@ -29,6 +35,10 @@ Options:
   --run-id <id>           Run identifier (must match the local run; default: generated)
   --scratch-branch <name> Override scratch branch name
                           (default: surgery/<runId>/finish)
+  --checkout-branch <name>
+                          Branch the cloud container clones into. Defaults to
+                          --base-branch. Pass the scratch branch when phases
+                          1–6 already pushed there (chained mode).
   --request <text>        Surgery request, only used to label the session
   --agent-env-id <id>     Managed-Agents environment ID
                           (default: read from secrets file or ANTHROPIC_AGENT_ENV_ID)
@@ -58,6 +68,9 @@ export function parseArgs(argv: string[]): CliArgs {
         break;
       case "--scratch-branch":
         args.scratchBranch = argv[++i];
+        break;
+      case "--checkout-branch":
+        args.checkoutBranch = argv[++i];
         break;
       case "--run-id":
         args.runId = argv[++i] ?? args.runId;
