@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SettingsModal, type SettingsState } from "./SettingsModal.js";
+import { playCheck, playClose, playLaunch, playOpen, playSelect, playToggle } from "../sounds.js";
 
 type RunStatus = {
   running: boolean;
@@ -17,7 +18,7 @@ const MODELS: ModelOption[] = [
 type ThinkingLevel = "off" | "low" | "medium" | "high";
 type PermissionMode = "acceptEdits" | "bypassPermissions";
 const PERMISSION_MODES: Array<{ id: PermissionMode; label: string; tag: string }> = [
-  { id: "acceptEdits", label: "Accept Edits", tag: "auto-approve file writes; use allowed-tools to unblock specific commands" },
+  { id: "acceptEdits", label: "Accept Edits", tag: "auto-approve file writes; use 'Auto-allow tools' to unblock specific commands" },
   { id: "bypassPermissions", label: "Bypass All", tag: "auto-approve everything including Bash — use with care" },
 ];
 const THINKING_LEVELS: Array<{ id: ThinkingLevel; label: string; tag: string }> = [
@@ -150,34 +151,15 @@ export function RunControls(): JSX.Element {
         <>
           <button
             onClick={() => setModalOpen(true)}
-            style={{
-              background: "var(--accent)",
-              color: "#07142c",
-              border: "none",
-              borderRadius: 4,
-              padding: "5px 14px",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-            }}
+            className="new-surgery-trigger"
           >
-            + New Surgery
+            ⚕ New Surgery
           </button>
           <button
             onClick={() => setSettingsOpen(true)}
             title="Settings"
             aria-label="Settings"
-            style={{
-              background: "transparent",
-              border: "1px solid #22284a",
-              color: "var(--muted)",
-              borderRadius: 4,
-              padding: "4px 8px",
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+            className="settings-trigger"
           >
             ⚙
           </button>
@@ -237,9 +219,11 @@ function NewSurgeryModal({
   const [baseBranch, setBaseBranch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missionId] = useState(() =>
+    Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, "0")
+  );
 
   useEffect(() => {
-    // Inject scrollbar styles
     const styleId = "modal-scrollbar-styles";
     if (!document.getElementById(styleId)) {
       const style = document.createElement("style");
@@ -247,11 +231,12 @@ function NewSurgeryModal({
       style.textContent = scrollbarStyles;
       document.head.appendChild(style);
     }
+    playOpen();
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape" && !submitting) onClose();
+      if (e.key === "Escape" && !submitting) { playClose(); onClose(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -295,6 +280,7 @@ function NewSurgeryModal({
 
   const start = async () => {
     if (canSubmit) return;
+    playLaunch();
     setSubmitting(true);
     setError(null);
     try {
@@ -341,12 +327,12 @@ function NewSurgeryModal({
 
   return (
     <div
-      onClick={() => !submitting && onClose()}
+      onClick={() => { if (!submitting) { playClose(); onClose(); } }}
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(5,7,16,0.72)",
-        backdropFilter: "blur(4px)",
+        background: "rgba(3,5,14,0.85)",
+        backdropFilter: "blur(6px)",
         zIndex: 2000,
         display: "flex",
         alignItems: "center",
@@ -354,44 +340,61 @@ function NewSurgeryModal({
         padding: 24,
       }}
     >
+      {/* scanline texture */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px)",
+        zIndex: 1,
+      }} />
       <div
         onClick={(e) => e.stopPropagation()}
+        className="surgery-modal-dialog"
         style={{
           background: "var(--panel)",
-          border: "1px solid #22284a",
+          border: "1px solid rgba(94,234,212,0.28)",
           borderRadius: 10,
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
           width: "min(640px, 100%)",
           height: "min(90vh, 100%)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          position: "relative",
+          zIndex: 2,
         }}
       >
         <div
           style={{
-            padding: "14px 20px",
-            borderBottom: "1px solid #22284a",
+            padding: "16px 20px",
+            borderBottom: "1px solid rgba(94,234,212,0.18)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background:
-              "linear-gradient(90deg, rgba(94,234,212,0.10), rgba(94,234,212,0))",
+            background: "linear-gradient(90deg, rgba(94,234,212,0.13), rgba(167,139,250,0.05), rgba(94,234,212,0))",
+            position: "relative",
           }}
         >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: 13,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--accent)",
-            }}
-          >
-            New Surgery
-          </h3>
+          <div className="hud-corner tl" />
+          <div className="hud-corner tr" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(94,234,212,0.5)", fontWeight: 700 }}>
+              ◈ Brownfield Code Surgeon &nbsp;·&nbsp; MISSION {missionId}
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--accent)",
+                fontWeight: 800,
+                textShadow: "0 0 20px rgba(94,234,212,0.5)",
+              }}
+            >
+              ⚕ NEW SURGERY
+            </h3>
+          </div>
           <button
-            onClick={onClose}
+            onClick={() => { playClose(); onClose(); }}
             disabled={submitting}
             style={closeBtn}
             title="Close (Esc)"
@@ -401,31 +404,37 @@ function NewSurgeryModal({
         </div>
 
         <div className="modal-content" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflow: "auto", flex: 1 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>
-              Run In
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="surgery-section-bar">Execution Mode</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div
+                className={`mode-card${runIn === "plugin" ? " selected" : ""}`}
+                onClick={() => { playSelect(); setRunIn("plugin"); }}
+                role="radio"
+                aria-checked={runIn === "plugin"}
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (playSelect(), setRunIn("plugin"))}
+              >
+                <span className="card-icon">🔌</span>
+                <span className="card-label">Plugin Mode</span>
+                <span className="card-sub">Use a Claude Code Plugin — Run from your terminal</span>
+              </div>
+              <div
+                className={`mode-card${runIn === "sdk" ? " selected" : ""}`}
+                onClick={() => { playSelect(); setRunIn("sdk"); }}
+                role="radio"
+                aria-checked={runIn === "sdk"}
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (playSelect(), setRunIn("sdk"))}
+              >
+                <span className="card-icon">⚡</span>
+                <span className="card-label">SDK Mode</span>
+                <span className="card-sub">Use Claude SDK - Run from this UI</span>
+              </div>
             </div>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg)" }}>
-              <input
-                type="radio"
-                name="runIn"
-                value="plugin"
-                checked={runIn === "plugin"}
-                onChange={() => setRunIn("plugin")}
-              />
-              Claude Code (as plugin)
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg)" }}>
-              <input
-                type="radio"
-                name="runIn"
-                value="sdk"
-                checked={runIn === "sdk"}
-                onChange={() => setRunIn("sdk")}
-              />
-              Claude Code SDK
-            </label>
           </div>
+
+          <div className="surgery-section-bar">Operative Parameters</div>
 
           <label style={label}>
             <span>Workspace folder</span>
@@ -507,7 +516,6 @@ function NewSurgeryModal({
                   In Claude Code, run:
                   <CommandBlock command="/brownfield-code-surgeon:surgery <<describe the new functionality>>" />
                 </li>
-                <li>Once the surgery completes, vitals will appear below</li>
               </ol>
             </div>
           )}
@@ -532,18 +540,20 @@ function NewSurgeryModal({
                 </label>
 
                 <label style={label}>
-                  <span>Thinking</span>
-                  <select
-                    value={thinking}
-                    onChange={(e) => setThinking(e.target.value as ThinkingLevel)}
-                    style={select}
-                  >
+                  <span>Thinking Depth</span>
+                  <div className="thinking-toggle">
                     {THINKING_LEVELS.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label} — {t.tag}
-                      </option>
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={thinking === t.id ? "active" : ""}
+                        onClick={() => { playToggle(); setThinking(t.id); }}
+                        title={t.tag}
+                      >
+                        {t.label}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </label>
               </div>
 
@@ -598,7 +608,7 @@ function NewSurgeryModal({
                   type="checkbox"
                   aria-label="auto-approve each phase"
                   checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
+                  onChange={(e) => { playCheck(); setAutoApprove(e.target.checked); }}
                 />
                 auto-approve each phase (skip the hand-off gates)
               </label>
@@ -628,7 +638,7 @@ function NewSurgeryModal({
                 type="checkbox"
                 aria-label="run finish phase on managed agent"
                 checked={managedFinish}
-                onChange={(e) => setManagedFinish(e.target.checked)}
+                onChange={(e) => { playCheck(); setManagedFinish(e.target.checked); }}
               />
               <span>
                 Run Finish Phase on Managed Agent
@@ -728,26 +738,33 @@ function NewSurgeryModal({
 
         <div
           style={{
-            padding: "12px 20px",
-            borderTop: "1px solid #22284a",
+            padding: "14px 20px",
+            borderTop: "1px solid rgba(94,234,212,0.15)",
             display: "flex",
             justifyContent: "flex-end",
+            alignItems: "center",
             gap: 10,
+            background: "linear-gradient(90deg, rgba(94,234,212,0), rgba(94,234,212,0.04))",
           }}
         >
-          <button onClick={onClose} disabled={submitting} style={secondaryBtn}>
+          <button
+            onClick={() => { playClose(); onClose(); }}
+            disabled={submitting}
+            style={{
+              ...secondaryBtn,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontSize: 11,
+            }}
+          >
             Cancel
           </button>
           <button
             onClick={start}
             disabled={canSubmit}
-            style={{
-              ...primaryBtn,
-              opacity: canSubmit ? 0.5 : 1,
-              cursor: canSubmit ? "not-allowed" : "pointer",
-            }}
+            className="start-surgery-btn"
           >
-            {submitting ? "starting…" : "Start"}
+            {submitting ? "⏳ INITIATING…" : "⚡ INITIATE SURGERY"}
           </button>
         </div>
       </div>
@@ -759,11 +776,12 @@ const label: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 6,
-  fontSize: 11,
-  letterSpacing: "0.08em",
+  fontSize: 9,
+  letterSpacing: "0.10em",
   textTransform: "uppercase",
   color: "var(--muted)",
-  fontWeight: 600,
+  fontWeight: 700,
+  fontFamily: "'Orbitron', ui-sans-serif, sans-serif",
 };
 
 const textarea: React.CSSProperties = {
@@ -794,7 +812,8 @@ const select: React.CSSProperties = {
   border: "1px solid #22284a",
   borderRadius: 4,
   padding: "8px 12px",
-  fontSize: 13,
+  fontSize: 12,
+  fontFamily: "ui-sans-serif, system-ui, sans-serif",
 };
 
 const primaryBtn: React.CSSProperties = {

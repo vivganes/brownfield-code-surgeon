@@ -33,27 +33,114 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--panel);
-  border-bottom: 1px solid #22284a;
+  padding: 10px 20px;
+  background: linear-gradient(180deg, #0f1830 0%, var(--panel) 100%);
+  border-bottom: 1px solid rgba(94,234,212,0.18);
+  box-shadow: 0 1px 0 rgba(94,234,212,0.06), 0 4px 24px rgba(0,0,0,0.5);
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 16px;
-  letter-spacing: 0.02em;
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(94,234,212,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.topbar h1 .title-sub {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: rgba(94,234,212,0.5);
+  text-shadow: none;
 }
 
 .topbar h1 span.dot {
   color: var(--accent);
-  margin-right: 8px;
+  margin-right: 6px;
+  text-shadow: 0 0 10px var(--accent);
 }
 
 .topbar .meta {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
   font-size: 12px;
   color: var(--muted);
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  align-items: center;
+}
+
+.hud-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0 10px;
+  border-left: 1px solid rgba(94,234,212,0.15);
+}
+.hud-readout .hud-label {
+  font-size: 7px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(94,234,212,0.5);
+  font-weight: 700;
+}
+.hud-readout .hud-value {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+}
+
+.new-surgery-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #0a1628;
+  background: linear-gradient(135deg, #5eead4 0%, #38bdf8 100%);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(94,234,212,0.3), 0 2px 8px rgba(0,0,0,0.4);
+  transition: transform 0.12s, box-shadow 0.2s;
+  animation: start-btn-pulse 2.8s ease-in-out infinite;
+}
+.new-surgery-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(94,234,212,0.5), 0 4px 12px rgba(0,0,0,0.45);
+}
+.new-surgery-trigger:active { transform: translateY(0); }
+
+.settings-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid rgba(94,234,212,0.22);
+  color: rgba(94,234,212,0.55);
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.settings-trigger:hover {
+  border-color: rgba(94,234,212,0.6);
+  color: var(--accent);
+  box-shadow: 0 0 10px rgba(94,234,212,0.18);
 }
 
 .grid {
@@ -245,4 +332,149 @@ html, body, #root {
   0%, 100% { box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.08) inset, 0 8px 24px rgba(0,0,0,0.35), 0 0 18px rgba(94, 234, 212, 0.18); }
   50%      { box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.18) inset, 0 8px 24px rgba(0,0,0,0.35), 0 0 32px rgba(94, 234, 212, 0.45); }
 }
+
+/* ── New Surgery Modal — Gamified ──────────────────────────────────── */
+@keyframes modal-materialize {
+  from { opacity: 0; transform: scale(0.93) translateY(-16px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes surgery-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(94,234,212,0.10) inset, 0 24px 64px rgba(0,0,0,0.75), 0 0 30px rgba(94,234,212,0.10); }
+  50%       { box-shadow: 0 0 0 1px rgba(94,234,212,0.22) inset, 0 24px 64px rgba(0,0,0,0.75), 0 0 55px rgba(94,234,212,0.28); }
+}
+@keyframes start-btn-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(94,234,212,0.35), 0 4px 12px rgba(0,0,0,0.4); }
+  50%       { box-shadow: 0 0 30px rgba(94,234,212,0.65), 0 4px 12px rgba(0,0,0,0.4); }
+}
+.surgery-modal-dialog {
+  animation: modal-materialize 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             surgery-border-pulse 3.5s ease-in-out 0.3s infinite;
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+}
+/* All text surfaces inside the modal inherit Orbitron */
+.surgery-modal-dialog h3,
+.surgery-modal-dialog label,
+.surgery-modal-dialog select,
+.surgery-modal-dialog button,
+.surgery-modal-dialog .surgery-section-bar,
+.surgery-modal-dialog .mode-card,
+.surgery-modal-dialog .thinking-toggle button {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+}
+/* Inputs & textareas keep a monospace terminal feel */
+.surgery-modal-dialog input,
+.surgery-modal-dialog textarea {
+  font-family: 'Share Tech Mono', ui-monospace, monospace !important;
+  letter-spacing: 0.04em;
+}
+/* Plain prose (plugin instruction list) reverts to system font for readability */
+.surgery-modal-dialog ol,
+.surgery-modal-dialog ol li {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: normal;
+}
+.hud-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(94,234,212,0.55);
+  border-style: solid;
+}
+.hud-corner.tl { top: 0; left: 0;  border-width: 2px 0 0 2px; }
+.hud-corner.tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.hud-corner.bl { bottom: 0; left: 0;  border-width: 0 0 2px 2px; }
+.hud-corner.br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+.surgery-section-bar {
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(94,234,212,0.55);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.surgery-section-bar::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(94,234,212,0.25), transparent);
+}
+.mode-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid #22284a;
+  background: var(--panel-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+.mode-card:hover { border-color: rgba(94,234,212,0.45); background: rgba(94,234,212,0.04); }
+.mode-card.selected {
+  border-color: var(--accent);
+  background: rgba(94,234,212,0.08);
+  box-shadow: 0 0 16px rgba(94,234,212,0.14);
+}
+.mode-card .card-icon  { font-size: 20px; line-height: 1; margin-bottom: 4px; }
+.mode-card .card-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
+  text-transform: uppercase; color: var(--fg);
+}
+.mode-card .card-sub   { font-size: 9px; color: var(--muted); letter-spacing: 0.02em; line-height: 1.35; font-family: ui-sans-serif, system-ui, sans-serif; }
+.thinking-toggle {
+  display: flex;
+  border: 1px solid #22284a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.thinking-toggle button {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: none;
+  border-right: 1px solid #22284a;
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.thinking-toggle button:last-child { border-right: none; }
+.thinking-toggle button.active { background: rgba(94,234,212,0.15); color: var(--accent); }
+.thinking-toggle button:hover:not(.active) { background: rgba(94,234,212,0.06); color: var(--fg); }
+.start-surgery-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 22px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a1628;
+  background: linear-gradient(135deg, #5eead4 0%, #38bdf8 100%);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(94,234,212,0.35), 0 4px 12px rgba(0,0,0,0.4);
+  transition: transform 0.12s, box-shadow 0.2s, opacity 0.15s;
+  animation: start-btn-pulse 2.2s ease-in-out infinite;
+}
+.start-surgery-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  animation: none;
+  box-shadow: none;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.start-surgery-btn:not(:disabled):hover  { transform: translateY(-1px); box-shadow: 0 0 28px rgba(94,234,212,0.55), 0 6px 16px rgba(0,0,0,0.45); }
+.start-surgery-btn:not(:disabled):active { transform: translateY(0); }
 

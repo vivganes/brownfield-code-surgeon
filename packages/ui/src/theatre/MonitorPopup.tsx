@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import { playClose, playOpen } from "../sounds.js";
 
 type MonitorPopupProps = {
   title: string;
@@ -8,9 +9,11 @@ type MonitorPopupProps = {
 };
 
 export function MonitorPopup({ title, children, onClose }: MonitorPopupProps): JSX.Element {
+  useEffect(() => { playOpen(); }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { playClose(); onClose(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -18,7 +21,7 @@ export function MonitorPopup({ title, children, onClose }: MonitorPopupProps): J
 
   return (
     <div
-      onClick={onClose}
+      onClick={() => { playClose(); onClose(); }}
       style={{
         position: "absolute",
         inset: 0,
@@ -71,7 +74,7 @@ export function MonitorPopup({ title, children, onClose }: MonitorPopupProps): J
             {title}
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { playClose(); onClose(); }}
             style={{
               background: "#1a2146",
               color: "#e6ecff",

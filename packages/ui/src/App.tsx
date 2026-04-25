@@ -26,16 +26,28 @@ export function App(): JSX.Element {
     <div className="app">
       <header className="topbar">
         <h1>
-          <span className="dot">●</span>
-          Brownfield Code Surgeon — Operating Theater
-        </h1>
-        <div className="meta" style={{ gap: 12, alignItems: "center" }}>
-          <RunControls />
-          <span>run: {vitals?.runId ?? "—"}</span>
-          <span>engine: {vitals?.engine ?? "—"}</span>
-          <span className={`connection ${connected ? "live" : ""}`}>
-            <span className="dot" /> {connected ? "live" : "offline"}
+          <span className="title-sub">◈ Tactical 7 Step Surgery System</span>
+          <span>
+            <span className="dot">⚕</span>
+            Brownfield Code Surgeon
           </span>
+        </h1>
+        <div className="meta">
+          <RunControls />
+          <div className="hud-readout">
+            <span className="hud-label">Run ID</span>
+            <span className="hud-value">{vitals?.runId ?? "—"}</span>
+          </div>
+          <div className="hud-readout">
+            <span className="hud-label">Engine</span>
+            <span className="hud-value">{vitals?.engine ?? "—"}</span>
+          </div>
+          <div className="hud-readout">
+            <span className="hud-label">Status</span>
+            <span className={`connection ${connected ? "live" : ""}`} style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10 }}>
+              <span className="dot" /> {connected ? "live" : "offline"}
+            </span>
+          </div>
         </div>
       </header>
       <div

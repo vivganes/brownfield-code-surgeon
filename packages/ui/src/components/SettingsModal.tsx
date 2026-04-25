@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { playClose, playOpen } from "../sounds.js";
 
 export interface SettingsState {
   githubTokenSet: boolean;
@@ -26,9 +27,11 @@ export function SettingsModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => { playOpen(); }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape" && !saving) onClose();
+      if (e.key === "Escape" && !saving) { playClose(); onClose(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -95,12 +98,12 @@ export function SettingsModal({
 
   return (
     <div
-      onClick={() => !saving && onClose()}
+      onClick={() => { if (!saving) { playClose(); onClose(); } }}
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(5,7,16,0.72)",
-        backdropFilter: "blur(4px)",
+        background: "rgba(3,5,14,0.85)",
+        backdropFilter: "blur(6px)",
         zIndex: 2000,
         display: "flex",
         alignItems: "center",
@@ -108,50 +111,68 @@ export function SettingsModal({
         padding: 24,
       }}
     >
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px)",
+        zIndex: 1,
+      }} />
       <div
         onClick={(e) => e.stopPropagation()}
+        className="surgery-modal-dialog"
         style={{
           background: "var(--panel)",
-          border: "1px solid #22284a",
+          border: "1px solid rgba(94,234,212,0.28)",
           borderRadius: 10,
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-          width: "min(560px, 100%)",
+          width: "min(520px, 100%)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          position: "relative",
+          zIndex: 2,
         }}
       >
         <div
           style={{
-            padding: "14px 20px",
-            borderBottom: "1px solid #22284a",
+            padding: "16px 20px",
+            borderBottom: "1px solid rgba(94,234,212,0.18)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background:
-              "linear-gradient(90deg, rgba(94,234,212,0.10), rgba(94,234,212,0))",
+            background: "linear-gradient(90deg, rgba(167,139,250,0.12), rgba(94,234,212,0.06), rgba(94,234,212,0))",
+            position: "relative",
           }}
         >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: 13,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--accent)",
-            }}
-          >
-            Settings
-          </h3>
-          <button onClick={onClose} disabled={saving} style={closeBtn} title="Close (Esc)">
+          <div className="hud-corner tl" />
+          <div className="hud-corner tr" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(167,139,250,0.6)", fontWeight: 700, fontFamily: "'Orbitron', sans-serif" }}>
+              ◈ Brownfield Code Surgeon &nbsp;·&nbsp; System Config
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--accent-2)",
+                fontWeight: 800,
+                textShadow: "0 0 20px rgba(167,139,250,0.5)",
+                fontFamily: "'Orbitron', sans-serif",
+              }}
+            >
+              ⚙ CONFIG
+            </h3>
+          </div>
+          <button onClick={() => { playClose(); onClose(); }} disabled={saving} style={closeBtn} title="Close (Esc)">
             ✕
           </button>
         </div>
 
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="surgery-section-bar" style={{ color: "rgba(167,139,250,0.55)", "--bar-color": "rgba(167,139,250,0.25)" } as React.CSSProperties}>Managed Agents Credentials</div>
           <label style={label}>
             <span>
-              GitHub token{current?.githubTokenSet ? " (configured)" : ""}
+              GitHub token{current?.githubTokenSet ? " ✓ configured" : ""}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <input
@@ -247,26 +268,28 @@ export function SettingsModal({
 
         <div
           style={{
-            padding: "12px 20px",
-            borderTop: "1px solid #22284a",
+            padding: "14px 20px",
+            borderTop: "1px solid rgba(94,234,212,0.15)",
             display: "flex",
             justifyContent: "flex-end",
+            alignItems: "center",
             gap: 10,
+            background: "linear-gradient(90deg, rgba(94,234,212,0), rgba(167,139,250,0.04))",
           }}
         >
-          <button onClick={onClose} disabled={saving} style={secondaryBtn}>
+          <button onClick={() => { playClose(); onClose(); }} disabled={saving} style={{ ...secondaryBtn, letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 11 }}>
             Cancel
           </button>
           <button
             onClick={() => void save()}
             disabled={saving}
+            className="start-surgery-btn"
             style={{
-              ...primaryBtn,
-              opacity: saving ? 0.5 : 1,
-              cursor: saving ? "not-allowed" : "pointer",
+              background: saving ? undefined : "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
+              boxShadow: saving ? undefined : "0 0 16px rgba(167,139,250,0.35), 0 4px 12px rgba(0,0,0,0.4)",
             }}
           >
-            {saving ? "saving…" : "Save"}
+            {saving ? "⏳ SAVING…" : "💾 SAVE CONFIG"}
           </button>
         </div>
       </div>
@@ -278,11 +301,12 @@ const label: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 6,
-  fontSize: 11,
-  letterSpacing: "0.08em",
+  fontSize: 9,
+  letterSpacing: "0.10em",
   textTransform: "uppercase",
   color: "var(--muted)",
-  fontWeight: 600,
+  fontWeight: 700,
+  fontFamily: "'Orbitron', ui-sans-serif, sans-serif",
 };
 
 const input: React.CSSProperties = {
@@ -292,7 +316,7 @@ const input: React.CSSProperties = {
   borderRadius: 4,
   padding: "8px 12px",
   fontSize: 13,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontFamily: "'Share Tech Mono', ui-monospace, monospace",
 };
 
 const select: React.CSSProperties = {
@@ -301,20 +325,8 @@ const select: React.CSSProperties = {
   border: "1px solid #22284a",
   borderRadius: 4,
   padding: "8px 12px",
-  fontSize: 13,
-};
-
-const primaryBtn: React.CSSProperties = {
-  background: "var(--accent)",
-  color: "#07142c",
-  border: "none",
-  borderRadius: 4,
-  padding: "8px 18px",
   fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  cursor: "pointer",
+  fontFamily: "'Orbitron', ui-sans-serif, sans-serif",
 };
 
 const secondaryBtn: React.CSSProperties = {
@@ -323,8 +335,9 @@ const secondaryBtn: React.CSSProperties = {
   border: "1px solid #22284a",
   borderRadius: 4,
   padding: "8px 14px",
-  fontSize: 12,
+  fontSize: 11,
   cursor: "pointer",
+  fontFamily: "'Orbitron', ui-sans-serif, sans-serif",
 };
 
 const closeBtn: React.CSSProperties = {
