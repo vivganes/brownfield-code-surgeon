@@ -86,6 +86,12 @@ export class SoundEngine {
     }
   }
 
+  approvalClick(): void {
+    // Immediate tactile feedback on click — snappy dink before the server confirms.
+    this.tone({ freq: 1046.5, type: "sine", dur: 0.055, gain: 0.55 });
+    this.tone({ freq: 830, type: "sine", dur: 0.09, gain: 0.22, delay: 0.045 });
+  }
+
   approvalConfirm(): void {
     this.tone({ freq: 523.25, type: "sine", dur: 0.12 });
     this.tone({ freq: 659.25, type: "sine", dur: 0.14, delay: 0.08 });

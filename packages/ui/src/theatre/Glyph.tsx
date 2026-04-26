@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import type { GlyphState } from "./useTheatreEvents";
 import type { Phase } from "../types";
+import { getSoundEngine } from "./audio/SoundEngine";
 
 type GlyphProps = {
   phase: Phase;
@@ -88,8 +89,9 @@ export function Glyph({
   const group = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
   const [hover, setHover] = useState(false);
+  const pressedAt = useRef<number | null>(null);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (!group.current) return;
     const t = clock.elapsedTime;
     let scale = 1;
@@ -117,6 +119,21 @@ export function Glyph({
         break;
       }
     }
+
+    // Press-punch: squish down then overshoot back up over ~350ms.
+    if (pressedAt.current !== null) {
+      const p = (performance.now() - pressedAt.current) / 1000;
+      if (p < 0.08) {
+        scale *= 0.58 + p / 0.08 * 0.42; // compress to 0.58
+      } else if (p < 0.22) {
+        scale *= 1.0 + Math.sin(((p - 0.08) / 0.14) * Math.PI) * 0.28; // overshoot
+      } else if (p < 0.38) {
+        scale *= 1.0; // settle
+      } else {
+        pressedAt.current = null;
+      }
+    }
+
     group.current.scale.setScalar(scale * (hover && clickable ? 1.1 : 1));
     group.current.rotation.y = t * 0.3 + index;
     if (light.current) light.current.intensity = emissive * 2;
@@ -149,12 +166,16 @@ export function Glyph({
         }}
         onClick={(e) => {
           e.stopPropagation();
-          if (isApproval) onApprove(phase);
+          if (!isApproval) return;
+          pressedAt.current = performance.now();
+          getSoundEngine().approvalClick();
+          onApprove(phase);
         }}
       >
         <GlyphMesh index={index} />
         <pointLight ref={light} color={COLOR_BY_STATE[state]} distance={1.6} intensity={0.4} />
       </group>
+
       <Html
         position={[0, -0.42, 0]}
         center
@@ -172,11 +193,15 @@ export function Glyph({
             letterSpacing: "0.18em",
             whiteSpace: "nowrap",
             textShadow: "0 0 6px rgba(0,0,0,0.85)",
+            textAlign: "center",
           }}
         >
-          {phase}
-          {state === "complete" ? " ✓" : ""}
-          {isApproval ? " ▸ approve" : ""}
+          <div>{phase}{state === "complete" ? " ✓" : ""}</div>
+          {isApproval && (
+            <div style={{ fontSize: 13, letterSpacing: "0.12em", marginTop: 3 }}>
+              ▸ click to approve
+            </div>
+          )}
         </div>
       </Html>
     </group>

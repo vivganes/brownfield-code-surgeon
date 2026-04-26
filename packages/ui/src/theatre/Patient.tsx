@@ -72,6 +72,8 @@ export function Patient({
   repoName,
 }: PatientProps): JSX.Element {
   const groupRef = useRef<THREE.Group>(null);
+  const bodyGroupRef = useRef<THREE.Group>(null);
+  const sideRot = useRef(0);
 
   // Pre-surgery: no run is in progress and nothing has finished in this UI
   // session. Stale "completed" phaseStatus from a previous run on disk would
@@ -132,23 +134,32 @@ export function Patient({
       g.position.x = 0;
       g.position.y = TABLE_TOP_Y;
     }
-    void dt;
+
+    const targetSide = (phase === "plan" || phase === "map") ? Math.PI / 2 : 0;
+    sideRot.current = THREE.MathUtils.damp(sideRot.current, targetSide, 2.0, dt);
+    if (bodyGroupRef.current) {
+      bodyGroupRef.current.rotation.z = sideRot.current;
+    }
   });
 
   return (
     <group ref={groupRef} position={[0, TABLE_TOP_Y, 0]}>
-      <Suspense fallback={null}>
-        <CatModel
-          targetHealth={targetHealth}
-          phase={phase}
-          finishedTs={finishedTs}
-          isPreSurgery={isPreSurgery}
-        />
-      </Suspense>
-      <Vines glyphs={effectiveGlyphs} />
+      <group ref={bodyGroupRef}>
+        <Suspense fallback={null}>
+          <CatModel
+            targetHealth={targetHealth}
+            phase={phase}
+            finishedTs={finishedTs}
+            isPreSurgery={isPreSurgery}
+          />
+        </Suspense>
+        <Vines glyphs={effectiveGlyphs} />
+        {effectiveGlyphs.break !== "complete" && <BloodDrips />}
+      </group>
       {phase === "plan" && <LaserScan />}
       {phase === "map" && <SeamLabels repoName={repoName} />}
-      {effectiveGlyphs.break !== "complete" && <BloodDrips />}
+      {effectiveGlyphs.cover === "complete" && finishedTs === 0 && <CoverHalo />}
+      {finishedTs > 0 && <HeartFloat />}
       {phase === "implement" && (
         <ImplementShimmer lastArtifactTs={lastArtifactTs} />
       )}
@@ -813,6 +824,67 @@ function ImplementShimmer({
         transparent
         opacity={0}
         toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HeartFloat — a pulsing ❤ rendered above the cat as it trots away.
+// Lives inside the same group so it naturally follows the trot motion.
+// ---------------------------------------------------------------------------
+
+function HeartFloat(): JSX.Element {
+  return (
+    <Html position={[0, 1.35, 0]} center distanceFactor={5} occlude={false} zIndexRange={[25, 0]}>
+      <style>{`
+        @keyframes hb-beat {
+          0%, 100% { transform: scale(1); }
+          14%       { transform: scale(1.35); }
+          28%       { transform: scale(1); }
+          42%       { transform: scale(1.2); }
+          70%       { transform: scale(1); }
+        }
+      `}</style>
+      <div style={{
+        fontSize: 84,
+        lineHeight: 1,
+        display: "inline-block",
+        color: "#ff1744",
+        animation: "hb-beat 0.85s ease-in-out infinite",
+        filter: "drop-shadow(0 0 10px rgba(255,23,68,0.9))",
+        userSelect: "none",
+      }}>
+        ♥
+      </div>
+    </Html>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CoverHalo — a quiet transparent sphere that appears once the cover phase
+// is approved: tests are in, the patient is protected.
+// Deliberately minimal — no rings, no beam, no colour cycling.
+// ---------------------------------------------------------------------------
+
+function CoverHalo(): JSX.Element {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (meshRef.current) {
+      const s = 1 + Math.sin(clock.elapsedTime * 0.8) * 0.02;
+      meshRef.current.scale.setScalar(s);
+    }
+  });
+  return (
+    <mesh ref={meshRef} position={[0, 0.75, 0]}>
+      <sphereGeometry args={[1.0, 32, 24]} />
+      <meshBasicMaterial
+        color="#a8d8ff"
+        transparent
+        opacity={0.09}
+        toneMapped={false}
+        side={THREE.BackSide}
+        depthWrite={false}
       />
     </mesh>
   );

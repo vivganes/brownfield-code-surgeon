@@ -18,6 +18,7 @@ import {
   ARTIFACT_PATHS,
   PHASES,
   appendEvent,
+  clearApproval,
   ensureSurgeryDir,
   emptyVitals,
   eventsFile,
@@ -25,6 +26,7 @@ import {
   readHeadSha,
   seamsFile,
   vitalsFile,
+  waitForApproval,
   writeVitals,
   type Phase,
   type SurgeryEvent,
@@ -34,6 +36,7 @@ import {
 const REPO_ROOT = path.resolve(process.env.TOY_REPO_ROOT ?? path.join(process.cwd(), ".toy-repo"));
 const TICK_MS = Number(process.env.TOY_TICK_MS ?? 800);
 const LOOP = (process.env.TOY_LOOP ?? "1") !== "0";
+const AUTO_APPROVE = process.argv.includes("--auto-approve");
 const ENGINE = "sdk" as const;
 
 function log(msg: string): void {
@@ -389,7 +392,8 @@ async function runPhase(
     await sleep(TICK_MS);
   }
 
-  // Approval gate: auto-grant after a brief pause so the UI shows the state.
+  // Approval gate: wait for a human (or auto-approve if --auto-approve flag was given).
+  await clearApproval(REPO_ROOT, phase);
   vitals.phaseStatus[phase] = "awaiting-approval";
   await emit(
     {
@@ -403,19 +407,38 @@ async function runPhase(
     },
     vitals,
   );
-  await sleep(TICK_MS * 2);
-  await emit(
-    {
-      type: "ApprovalGranted",
-      timestamp: new Date().toISOString(),
-      phase,
-      engine: ENGINE,
-      runId,
-      approvedBy: "toy-backend",
-      note: "auto-approved",
-    },
-    vitals,
-  );
+
+  if (AUTO_APPROVE) {
+    await sleep(TICK_MS * 2);
+    await emit(
+      {
+        type: "ApprovalGranted",
+        timestamp: new Date().toISOString(),
+        phase,
+        engine: ENGINE,
+        runId,
+        approvedBy: "toy-backend",
+        note: "auto-approved",
+      },
+      vitals,
+    );
+  } else {
+    log(`[${phase}] awaiting approval — POST /api/approvals/${phase} to continue`);
+    const token = await waitForApproval(REPO_ROOT, phase);
+    log(`[${phase}] approval received from ${token.approvedBy}`);
+    await emit(
+      {
+        type: "ApprovalGranted",
+        timestamp: new Date().toISOString(),
+        phase,
+        engine: ENGINE,
+        runId,
+        approvedBy: token.approvedBy,
+        note: token.note,
+      },
+      vitals,
+    );
+  }
   await sleep(TICK_MS);
 
   vitals.phaseStatus[phase] = "completed";
@@ -472,9 +495,10 @@ async function waitForRestartSignal(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  log(`repo root: ${REPO_ROOT}`);
-  log(`tick:      ${TICK_MS}ms`);
-  log(`loop:      ${LOOP}`);
+  log(`repo root:    ${REPO_ROOT}`);
+  log(`tick:         ${TICK_MS}ms`);
+  log(`loop:         ${LOOP}`);
+  log(`auto-approve: ${AUTO_APPROVE}`);
   // Clear any stale signal from a previous process.
   await fsp.unlink(RESTART_SIGNAL).catch(() => {});
   do {
