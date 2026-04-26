@@ -12,11 +12,16 @@ import { InstrumentTray } from "./InstrumentTray";
 import { useTheatreState } from "./useTheatreEvents";
 import { useEventCues } from "./audio/cues";
 import { getSoundEngine } from "./audio/SoundEngine";
+import { playPlanReady, playSeamsReady } from "../sounds.js";
 import { OperatingFieldMonitor } from "./monitors/OperatingFieldMonitor";
 import { TheatreLogMonitor } from "./monitors/TheatreLogMonitor";
 import { PatientStatusMonitor } from "./monitors/PatientStatusMonitor";
 import { OperatingRoomDetails } from "./OperatingRoomDetails";
 import { MonitorPopup } from "./MonitorPopup";
+import { PlanArtifactCard } from "./PlanArtifactCard";
+import { PlanDialog } from "./PlanDialog";
+import { SeamsArtifactCard } from "./SeamsArtifactCard";
+import { SeamsDialog } from "./SeamsDialog";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 type SceneProps = {
@@ -24,6 +29,8 @@ type SceneProps = {
   events: SurgeryEvent[];
   engine: "plugin" | "sdk" | "managed";
   onApprove: (phase: Phase) => void;
+  planReady: boolean;
+  seamsReady: boolean;
 };
 
 const INITIAL_CAMERA: [number, number, number] = [0, 1.9, 7.5];
@@ -68,6 +75,8 @@ export function TheatreScene({
   events,
   engine,
   onApprove,
+  planReady,
+  seamsReady,
 }: SceneProps): JSX.Element {
   const monitorPanels = useMemo(
     () => [
@@ -89,6 +98,10 @@ export function TheatreScene({
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [introComplete, setIntroComplete] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [showPlanToast, setShowPlanToast] = useState(false);
+  const [seamsDialogOpen, setSeamsDialogOpen] = useState(false);
+  const [showSeamsToast, setShowSeamsToast] = useState(false);
   const [ackFinishTs, setAckFinishTs] = useState(0);
   const effectiveFinishedTs =
     state.finishedTs > ackFinishTs ? state.finishedTs : 0;
@@ -113,6 +126,22 @@ export function TheatreScene({
   }, [volume]);
 
   useEventCues(events, audioOn);
+
+  useEffect(() => {
+    if (!planReady) return;
+    playPlanReady();
+    setShowPlanToast(true);
+    const t = setTimeout(() => setShowPlanToast(false), 7000);
+    return () => clearTimeout(t);
+  }, [planReady]);
+
+  useEffect(() => {
+    if (!seamsReady) return;
+    playSeamsReady();
+    setShowSeamsToast(true);
+    const t = setTimeout(() => setShowSeamsToast(false), 7000);
+    return () => clearTimeout(t);
+  }, [seamsReady]);
 
   const alarm =
     state.lastTestFailTs > 0 && Date.now() - state.lastTestFailTs < 4000;
@@ -174,6 +203,19 @@ export function TheatreScene({
           repoName={repoName}
         />
         <MonitorWall panels={monitorPanels} onOpen={setOpenIndex} />
+        {planReady && (
+          // Left side wall: x=-12, faces +x (room centre).
+          <group position={[-11.85, 2.8, -5.5]} rotation={[0, -Math.PI / 2, 0]}>
+            <PlanArtifactCard onClick={() => setPlanDialogOpen(true)} />
+          </group>
+        )}
+        {seamsReady && (
+          // Right side wall: x=+12, faces -x (room centre).
+          // rotation [0, π/2, 0] makes local -z point toward -x so Html faces inward.
+          <group position={[11.85, 2.8, -5.5]} rotation={[0, Math.PI / 2, 0]}>
+            <SeamsArtifactCard onClick={() => setSeamsDialogOpen(true)} />
+          </group>
+        )}
         <InstrumentTray
           glyphs={state.glyphs}
           clickable={clickable}
@@ -181,6 +223,26 @@ export function TheatreScene({
         />
         <fog attach="fog" args={["#05070e", 10, 30]} />
       </Canvas>
+
+      {/* Plan-ready toast */}
+      {showPlanToast && (
+        <div className="plan-toast">
+          <span className="plan-toast-icon">◈</span>
+          <span className="plan-toast-text">Operative plan ready — see left wall</span>
+          <button className="plan-toast-open" onClick={() => { setShowPlanToast(false); setPlanDialogOpen(true); }}>open</button>
+          <button className="plan-toast-close" onClick={() => setShowPlanToast(false)} title="Dismiss">✕</button>
+        </div>
+      )}
+
+      {/* Seams-ready toast */}
+      {showSeamsToast && (
+        <div className="seams-toast">
+          <span className="seams-toast-icon">⬡</span>
+          <span className="seams-toast-text">Seams &amp; dependencies ready — see right wall</span>
+          <button className="seams-toast-open" onClick={() => { setShowSeamsToast(false); setSeamsDialogOpen(true); }}>open</button>
+          <button className="seams-toast-close" onClick={() => setShowSeamsToast(false)} title="Dismiss">✕</button>
+        </div>
+      )}
 
       {/* HUD */}
       <div
@@ -241,6 +303,13 @@ export function TheatreScene({
             restart surgery
           </button>
         </div>
+      )}
+
+      {planDialogOpen && (
+        <PlanDialog onClose={() => setPlanDialogOpen(false)} />
+      )}
+      {seamsDialogOpen && (
+        <SeamsDialog onClose={() => setSeamsDialogOpen(false)} />
       )}
 
       {openIndex != null && monitorPanels[openIndex] && (

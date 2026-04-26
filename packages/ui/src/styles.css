@@ -458,3 +458,266 @@ html, body, #root {
 .start-surgery-btn:not(:disabled):hover  { transform: translateY(-1px); box-shadow: 0 0 28px rgba(94,234,212,0.55), 0 6px 16px rgba(0,0,0,0.45); }
 .start-surgery-btn:not(:disabled):active { transform: translateY(0); }
 
+/* ── Artifact-ready toasts (plan + seams) ──────────────────────────── */
+@keyframes plan-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)     scale(1); }
+}
+@keyframes plan-toast-glow {
+  0%, 100% { box-shadow: 0 0 28px rgba(167,139,250,0.30), 0 6px 24px rgba(0,0,0,0.55); }
+  50%       { box-shadow: 0 0 56px rgba(167,139,250,0.65), 0 6px 28px rgba(0,0,0,0.55), 0 0 80px rgba(167,139,250,0.20); }
+}
+@keyframes seams-toast-glow {
+  0%, 100% { box-shadow: 0 0 28px rgba(52,211,153,0.28), 0 6px 24px rgba(0,0,0,0.55); }
+  50%       { box-shadow: 0 0 56px rgba(52,211,153,0.60), 0 6px 28px rgba(0,0,0,0.55), 0 0 80px rgba(52,211,153,0.18); }
+}
+.plan-toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  background: rgba(7, 5, 20, 0.94);
+  border: 1px solid #5b3fa8;
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+  animation:
+    plan-toast-in   0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    plan-toast-glow 1.6s  ease-in-out 0.38s infinite;
+}
+.plan-toast-icon  { color: #a78bfa; font-size: 20px; line-height: 1; }
+.plan-toast-text  { color: #c4b5fd; letter-spacing: 0.04em; }
+.plan-toast-open {
+  padding: 5px 14px;
+  background: rgba(167,139,250,0.18);
+  border: 1px solid #5b3fa8;
+  border-radius: 5px;
+  color: #a78bfa;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.plan-toast-open:hover  { background: rgba(167,139,250,0.32); box-shadow: 0 0 12px rgba(167,139,250,0.25); }
+.plan-toast-close {
+  background: none; border: none;
+  color: #6b52b8; font-size: 15px;
+  cursor: pointer; padding: 0 2px; line-height: 1;
+  transition: color 0.15s;
+}
+.plan-toast-close:hover { color: #c4b5fd; }
+
+/* ── Seams-ready toast ─────────────────────────────────────────────── */
+.seams-toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  background: rgba(4, 16, 10, 0.94);
+  border: 1px solid #1a7a42;
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+  animation:
+    plan-toast-in    0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    seams-toast-glow 1.6s  ease-in-out 0.38s infinite;
+}
+.seams-toast-icon  { color: #34d399; font-size: 20px; line-height: 1; }
+.seams-toast-text  { color: #6ee7b7; letter-spacing: 0.04em; }
+.seams-toast-open {
+  padding: 5px 14px;
+  background: rgba(52,211,153,0.14);
+  border: 1px solid #1a7a42;
+  border-radius: 5px;
+  color: #34d399;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.seams-toast-open:hover  { background: rgba(52,211,153,0.30); box-shadow: 0 0 12px rgba(52,211,153,0.25); }
+.seams-toast-close {
+  background: none; border: none;
+  color: #1a7a42; font-size: 15px;
+  cursor: pointer; padding: 0 2px; line-height: 1;
+  transition: color 0.15s;
+}
+.seams-toast-close:hover { color: #6ee7b7; }
+
+/* ── Plan artifact card (markdown dialog body) ─────────────────────── */
+.plan-md-body h1 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #a78bfa;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a1f4a;
+}
+.plan-md-body h2 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #c4b5fd;
+  letter-spacing: 0.05em;
+  margin: 22px 0 8px;
+}
+.plan-md-body h3 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ddd6fe;
+  letter-spacing: 0.04em;
+  margin: 16px 0 6px;
+}
+.plan-md-body h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ede9fe;
+  margin: 12px 0 4px;
+}
+.plan-md-body p {
+  margin: 4px 0;
+  color: #cdd5f0;
+}
+.plan-md-body ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.plan-md-body li {
+  color: #cdd5f0;
+  margin-bottom: 4px;
+}
+.plan-md-body code {
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 12px;
+  background: rgba(167,139,250,0.1);
+  color: #c4b5fd;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(167,139,250,0.2);
+}
+.plan-md-body pre {
+  background: #080c1c;
+  border: 1px solid #2a1f4a;
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  overflow-x: auto;
+}
+.plan-md-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #a78bfa;
+  font-size: 12px;
+  white-space: pre;
+}
+.plan-md-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.plan-md-body th,
+.plan-md-body td {
+  padding: 7px 14px;
+  border: 1px solid #2a1f4a;
+  text-align: left;
+  vertical-align: top;
+}
+.plan-md-body th {
+  background: rgba(167,139,250,0.1);
+  color: #c4b5fd;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.plan-md-body td {
+  color: #cdd5f0;
+}
+.plan-md-body tr:nth-child(even) td {
+  background: rgba(167,139,250,0.04);
+}
+.plan-md-body strong {
+  color: #ede9fe;
+  font-weight: 700;
+}
+.plan-md-body em {
+  color: #c4b5fd;
+  font-style: italic;
+}
+
+/* ── Seams dialog body ─────────────────────────────────────────────── */
+.seams-md-body h1 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 20px; font-weight: 800;
+  color: #34d399; letter-spacing: 0.06em;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid #166534;
+}
+.seams-md-body h2 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 15px; font-weight: 700;
+  color: #6ee7b7; letter-spacing: 0.05em;
+  margin: 22px 0 8px;
+}
+.seams-md-body h3 {
+  font-family: 'Orbitron', ui-sans-serif, sans-serif;
+  font-size: 12px; font-weight: 700;
+  color: #a7f3d0; letter-spacing: 0.04em;
+  margin: 16px 0 6px;
+}
+.seams-md-body h4 { font-size: 12px; font-weight: 700; color: #d1fae5; margin: 12px 0 4px; }
+.seams-md-body p  { margin: 4px 0; color: #cdd5f0; }
+.seams-md-body ul { margin: 6px 0; padding-left: 20px; }
+.seams-md-body li { color: #cdd5f0; margin-bottom: 4px; }
+.seams-md-body code {
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 12px;
+  background: rgba(52,211,153,0.1);
+  color: #6ee7b7;
+  padding: 1px 5px; border-radius: 3px;
+  border: 1px solid rgba(52,211,153,0.2);
+}
+.seams-md-body pre {
+  background: #04100a; border: 1px solid #166534;
+  border-radius: 6px; padding: 14px 18px;
+  margin: 10px 0; overflow-x: auto;
+}
+.seams-md-body pre code {
+  background: none; border: none; padding: 0;
+  color: #34d399; font-size: 12px; white-space: pre;
+}
+.seams-md-body table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+.seams-md-body th,
+.seams-md-body td  { padding: 7px 14px; border: 1px solid #166534; text-align: left; vertical-align: top; }
+.seams-md-body th  {
+  background: rgba(52,211,153,0.1); color: #6ee7b7;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.seams-md-body td  { color: #cdd5f0; }
+.seams-md-body tr:nth-child(even) td { background: rgba(52,211,153,0.04); }
+.seams-md-body strong { color: #d1fae5; font-weight: 700; }
+.seams-md-body em    { color: #6ee7b7; font-style: italic; }
+

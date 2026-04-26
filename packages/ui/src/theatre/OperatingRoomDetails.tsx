@@ -3,11 +3,21 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
 
+function pad(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+function fmtTime(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export function OperatingRoomDetails(): JSX.Element {
   return (
     <group>
       <IvDrip position={[-3.4, -1.5, 1.2]} />
-      <MonitorCart position={[-5.5, -1.5, 2.4]} />
+      <MonitorCart position={[-4.5, -1.5, 2.4]} />
       <SupplyCabinet position={[-10.5, -1.5, -3]} rotation={[0, Math.PI / 2, 0]} />
       <SupplyCabinet position={[10.5, -1.5, -3]} rotation={[0, -Math.PI / 2, 0]} />
       <BiohazardBin position={[-7, -1.5, 3]} />
@@ -120,11 +130,24 @@ function AnesthesiaMachine({ position }: { position: [number, number, number] })
 }
 
 function MonitorCart({ position }: { position: [number, number, number] }): JSX.Element {
-  const pulse = useRef<THREE.MeshStandardMaterial>(null);
-  useFrame(({ clock }) => {
-    if (pulse.current)
-      pulse.current.emissiveIntensity = 0.6 + (Math.sin(clock.elapsedTime * 2.4) + 1) * 0.4;
+  const timeRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
+  const lastSec = useRef(-1);
+
+  useFrame(() => {
+    const now = new Date();
+    const sec = now.getSeconds();
+    if (sec !== lastSec.current) {
+      lastSec.current = sec;
+      if (timeRef.current) timeRef.current.textContent = fmtTime(now);
+      if (dateRef.current) dateRef.current.textContent = fmtDate(now);
+    }
   });
+
+  const now = new Date();
+
+  // Screen: 1.2 w × 0.85 h world units, centre at y=1.55 (above stand top at y=1.0)
+  // Html:   1.1 × 0.75 inner → 220 × 150 px @ scale 0.5
   return (
     <group position={position}>
       {/* Stand */}
@@ -132,20 +155,60 @@ function MonitorCart({ position }: { position: [number, number, number] }): JSX.
         <boxGeometry args={[0.5, 1.0, 0.5]} />
         <meshStandardMaterial color="#8a94ad" metalness={0.5} roughness={0.5} />
       </mesh>
-      {/* Screen */}
-      <mesh position={[0, 1.25, 0]}>
-        <boxGeometry args={[0.7, 0.5, 0.08]} />
-        <meshStandardMaterial color="#0a0d1a" metalness={0.2} roughness={0.5} />
+      {/* Screen bezel */}
+      <mesh position={[0, 1.55, 0]}>
+        <boxGeometry args={[1.3, 0.95, 0.09]} />
+        <meshStandardMaterial color="#0a0d1a" metalness={0.25} roughness={0.5} />
       </mesh>
-      <mesh position={[0, 1.25, 0.045]}>
-        <planeGeometry args={[0.6, 0.4]} />
-        <meshStandardMaterial
-          ref={pulse}
-          color="#0a1026"
-          emissive="#22c55e"
-          emissiveIntensity={1}
-        />
+      {/* Screen surface — black */}
+      <mesh position={[0, 1.55, 0.05]}>
+        <planeGeometry args={[1.2, 0.85]} />
+        <meshStandardMaterial color="#050505" roughness={0.6} />
       </mesh>
+      {/* Live clock — 220×150 px @ scale 0.5 = 1.1×0.75 world units */}
+      <Html
+        transform
+        position={[0, 1.55, 0.06]}
+        scale={0.5}
+        style={{ pointerEvents: "none" }}
+        zIndexRange={[5, 0]}
+      >
+        <div
+          style={{
+            width: 220,
+            height: 150,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            fontFamily: "'Share Tech Mono', ui-monospace, monospace",
+            userSelect: "none",
+          }}
+        >
+          <div style={{ fontSize: 7, color: "#4ade80", letterSpacing: "0.22em", opacity: 0.65 }}>
+            OR TIME
+          </div>
+          <div
+            ref={timeRef}
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#4ade80",
+              letterSpacing: "0.06em",
+              textShadow: "0 0 8px rgba(74,222,128,0.75)",
+            }}
+          >
+            {fmtTime(now)}
+          </div>
+          <div
+            ref={dateRef}
+            style={{ fontSize: 7, color: "#22c55e", letterSpacing: "0.14em", opacity: 0.7 }}
+          >
+            {fmtDate(now)}
+          </div>
+        </div>
+      </Html>
       {/* Wheels */}
       {[[-0.22, -0.05, 0.22], [0.22, -0.05, 0.22], [-0.22, -0.05, -0.22], [0.22, -0.05, -0.22]].map(
         (p, i) => (

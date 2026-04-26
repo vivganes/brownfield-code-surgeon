@@ -1,6 +1,7 @@
 let ctx: AudioContext | null = null;
 
-function ac(): AudioContext {
+function ac(): AudioContext | null {
+  if (typeof AudioContext === "undefined") return null;
   if (!ctx) ctx = new AudioContext();
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
@@ -16,6 +17,7 @@ function osc(
   endType: "exp" | "lin" = "exp",
 ): void {
   const c = ac();
+  if (!c) return;
   const t0 = c.currentTime + startAt;
   const o = c.createOscillator();
   const g = c.createGain();
@@ -57,6 +59,21 @@ export function playToggle(): void {
 /** Checkbox tick — soft click */
 export function playCheck(): void {
   osc("triangle", 400, 600, 0.06, 0.04);
+}
+
+/** Plan.md ready — three ascending chime tones, low-to-high, purple feel */
+export function playPlanReady(): void {
+  osc("sine", 329.63, 329.63, 0.40, 0.07);                 // E4 — warm low note
+  osc("sine", 523.25, 523.25, 0.35, 0.06, 0.13);           // C5
+  osc("sine", 783.99, 783.99, 0.40, 0.08, 0.26);           // G5 — chime peak
+  osc("sine", 1046.5, 700,    0.30, 0.025, 0.38);          // shimmer tail, falls away
+}
+
+/** Seams ready — two crisp staccato pings, bright + connected */
+export function playSeamsReady(): void {
+  osc("triangle", 1108.73, 1108.73, 0.13, 0.08);           // C#6 — sharp first ping
+  osc("triangle", 1318.51, 1318.51, 0.11, 0.07, 0.10);    // E6 — second ping
+  osc("sine",     1567.98, 1567.98, 0.25, 0.04, 0.18);    // G6 — bright resonant tail
 }
 
 /** ⚡ INITIATE SURGERY — power-up sweep + triad chord hit */

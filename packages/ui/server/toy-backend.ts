@@ -78,8 +78,11 @@ function gitToy(...args: string[]): void {
 }
 
 async function resetRepo(): Promise<void> {
-  // Nuke everything from a previous toy run, including the .git dir, so each
-  // run starts from an identical baseline commit.
+  // Delete the plan/ directory first so the UI server detects its absence and
+  // resets the plan-ready flag before the new run writes a fresh plan.md.
+  await fsp.rm(path.join(REPO_ROOT, "plan"), { recursive: true, force: true });
+  // Nuke everything else from a previous toy run, including the .git dir, so
+  // each run starts from an identical baseline commit.
   await fsp.rm(REPO_ROOT, { recursive: true, force: true });
   fs.mkdirSync(REPO_ROOT, { recursive: true });
   await ensureSurgeryDir(REPO_ROOT);
@@ -197,26 +200,112 @@ const SCRIPTS: Record<Phase, PhaseScript> = {
   },
 };
 
-const PLAN_MD = `# Surgical Plan
+const PLAN_MD = `# Surgical Plan — MFA for AuthService
 
-## Patient
-Demo repo (toy backend simulation).
+**Repo:** demo-patient
+**Request:** Add multi-factor authentication to the auth layer, preserving existing session token semantics and all current call-sites.
+**Surgeon:** Brownfield Code Surgeon v0.1 (sdk)
+**Baseline commit:** pre-surgery baseline
 
-## Request
-"Add MFA support to authentication, preserving existing session semantics."
+---
 
-## Phases
-1. **plan** — sketch approach
-2. **map** — identify seams & dependencies
-3. **break** — introduce seams
-4. **cover** — add characterization tests
-5. **implement** — apply change
-6. **refactor** — clean up
-7. **finish** — docs & verify
+## 1. Codebase Snapshot
 
-## Risks
-- Auth touches every request path
-- Session token format must remain backwards-compatible
+Scanned 3 source files, 1 config, 1 README.
+
+| File | Lines | Role |
+|---|---|---|
+| \`src/auth/AuthService.ts\` | 6 | Single-factor token verifier — the primary patient |
+| \`src/billing/Charges.ts\` | 7 | Billing stub — calls nothing in auth, safe to ignore |
+| \`README.md\` | 7 | Documentation only |
+
+\`AuthService.verify(token)\` is the single entry point for authentication. It currently accepts any non-empty string as valid, which is the seam we will exploit.
+
+---
+
+## 2. Change Request Analysis
+
+The request is to introduce **MFA (multi-factor authentication)** as an opt-in second factor, without breaking the current single-factor contract. Callers that do not supply an MFA strategy must continue to work identically.
+
+**Approach — Strategy Pattern injection:**
+
+\`\`\`
+Before:  AuthService.verify(token) → boolean
+After:   AuthService(mfa?: MfaStrategy).verify(token) → boolean
+\`\`\`
+
+The \`MfaStrategy\` interface is a seam: the constructor accepts an optional strategy object. When no strategy is provided, behaviour is identical to today. When one is provided, \`verify()\` delegates the second-factor challenge before returning.
+
+This is a *conservative* change — no call-site needs to be modified unless it wants MFA.
+
+---
+
+## 3. Phase-by-Phase Plan
+
+### Phase 1 — plan *(this document)*
+Analyse codebase, identify seams, produce this plan. Gate: human approval.
+
+### Phase 2 — map
+Trace all call-sites of \`AuthService\` and \`chargeUser\`. Confirm no hidden coupling between auth and billing. Produce \`seams-and-dependencies.md\`. Gate: human approval.
+
+### Phase 3 — break
+Introduce the \`MfaStrategy\` interface and make \`AuthService\` accept it via constructor injection. **No behaviour change yet** — strategy is optional and defaults to \`undefined\`, so \`verify()\` still returns \`token.length > 0\`.
+
+Files touched:
+- \`src/auth/AuthService.ts\` — add interface + constructor parameter
+
+### Phase 4 — cover
+Write characterization tests that pin the *current* behaviour before we change it:
+- \`verify('')\` → \`false\`
+- \`verify('any-token')\` → \`true\` (no MFA strategy)
+- \`verify('token', totp)\` → delegates to strategy (stub)
+
+Files created:
+- \`src/auth/AuthService.test.ts\`
+- \`src/billing/Charges.test.ts\` (baseline coverage for billing, no changes expected)
+
+Target: statement coverage ≥ 80 % on \`AuthService.ts\`. Gate: human approval + green tests.
+
+### Phase 5 — implement
+Activate the MFA path:
+- When \`this.mfa\` is set, call \`this.mfa.challenge(token)\` and AND the result with the first-factor check.
+- Guard: return \`false\` immediately on empty token regardless of strategy.
+
+Files touched:
+- \`src/auth/AuthService.ts\`
+
+All existing tests must remain green. Gate: human approval + green tests.
+
+### Phase 6 — refactor
+Clean up:
+- Rename internal \`mfa\` field to \`_secondFactor\` to signal it is private-by-convention.
+- Extract the empty-token guard into a named private method \`#isEmpty(token)\` for readability.
+- No functional changes — tests must stay green.
+
+### Phase 7 — finish
+- Update \`README.md\` with usage example for the new MFA constructor parameter.
+- Run full suite one final time and record result in \`docs/CHANGES.md\`.
+
+---
+
+## 4. Risk Register
+
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+| Hidden call-sites that pass no token and rely on truthy return | Low | Phase 2 grep will surface them; Phase 4 tests will catch regressions |
+| \`MfaStrategy.challenge\` throwing instead of returning \`false\` | Medium | Wrap call in try/catch in Phase 5; return \`false\` on throw |
+| Session token format changes breaking downstream | None | We are not touching token format — only the verification side |
+| Billing accidentally coupled to auth | Unlikely | Phase 2 map will confirm; currently no imports cross the boundary |
+
+---
+
+## 5. Acceptance Criteria
+
+- [ ] \`AuthService\` with no constructor arg behaves identically to today
+- [ ] \`AuthService\` with a TOTP strategy fails on bad second-factor
+- [ ] Statement coverage on \`src/auth/AuthService.ts\` ≥ 80 %
+- [ ] Zero regressions in \`src/billing/\`
+- [ ] \`README.md\` documents the new API
 `;
 
 const SEAMS_MD = `# Seams & Dependencies

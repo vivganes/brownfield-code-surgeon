@@ -5,6 +5,8 @@ export type StreamState = {
   connected: boolean;
   vitals: Vitals | null;
   events: SurgeryEvent[];
+  planReady: boolean;
+  seamsReady: boolean;
 };
 
 const MAX_EVENTS = 500;
@@ -13,6 +15,8 @@ export function useSurgeryStream(): StreamState {
   const [connected, setConnected] = useState(false);
   const [vitals, setVitals] = useState<Vitals | null>(null);
   const [events, setEvents] = useState<SurgeryEvent[]>([]);
+  const [planReady, setPlanReady] = useState(false);
+  const [seamsReady, setSeamsReady] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -20,6 +24,10 @@ export function useSurgeryStream(): StreamState {
     esRef.current = es;
 
     es.addEventListener("hello", () => setConnected(true));
+    es.addEventListener("plan-ready",    () => setPlanReady(true));
+    es.addEventListener("plan-removed",  () => setPlanReady(false));
+    es.addEventListener("seams-ready",   () => setSeamsReady(true));
+    es.addEventListener("seams-removed", () => setSeamsReady(false));
     es.addEventListener("vitals", (ev) => {
       try {
         setVitals(JSON.parse((ev as MessageEvent).data));
@@ -47,5 +55,5 @@ export function useSurgeryStream(): StreamState {
     };
   }, []);
 
-  return { connected, vitals, events };
+  return { connected, vitals, events, planReady, seamsReady };
 }

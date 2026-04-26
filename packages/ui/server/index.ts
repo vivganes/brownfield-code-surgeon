@@ -129,6 +129,8 @@ function handleStream(req: http.IncomingMessage, res: http.ServerResponse): void
       for (const ev of events) {
         res.write(`event: event\ndata: ${JSON.stringify(ev)}\n\n`);
       }
+      if (planMdKnown)  res.write(`event: plan-ready\ndata: {}\n\n`);
+      if (seamsMdKnown) res.write(`event: seams-ready\ndata: {}\n\n`);
       res.write("event: hello\ndata: {}\n\n");
     } catch (err) {
       res.write(`event: error\ndata: ${JSON.stringify({ message: String(err) })}\n\n`);
@@ -401,10 +403,49 @@ server.listen(PORT, () => {
 // Start tailing the events file and rebroadcasting vitals changes.
 const eventsPath = eventsFile(REPO_ROOT);
 const vitalsPath = vitalsFile(REPO_ROOT);
+const planMdPath = planFile(REPO_ROOT);
+const seamsMdPath = seamsFile(REPO_ROOT);
 
 watchEventsFile(eventsPath, (event: SurgeryEvent) => {
   broadcast("event", event);
 });
+
+// Poll plan.md — broadcast plan-ready on appearance, plan-removed on deletion.
+let planMdKnown = false;
+// Eagerly check so the flag is correct before any client connects.
+fsp.stat(planMdPath).then(() => { planMdKnown = true; }).catch(() => {});
+setInterval(async () => {
+  try {
+    await fsp.stat(planMdPath);
+    if (!planMdKnown) {
+      planMdKnown = true;
+      broadcast("plan-ready", {});
+    }
+  } catch {
+    if (planMdKnown) {
+      planMdKnown = false;
+      broadcast("plan-removed", {});
+    }
+  }
+}, 500);
+
+// Poll seams-and-dependencies.md — same pattern as plan.md.
+let seamsMdKnown = false;
+fsp.stat(seamsMdPath).then(() => { seamsMdKnown = true; }).catch(() => {});
+setInterval(async () => {
+  try {
+    await fsp.stat(seamsMdPath);
+    if (!seamsMdKnown) {
+      seamsMdKnown = true;
+      broadcast("seams-ready", {});
+    }
+  } catch {
+    if (seamsMdKnown) {
+      seamsMdKnown = false;
+      broadcast("seams-removed", {});
+    }
+  }
+}, 500);
 
 // Poll vitals.json (simpler and works cross-platform on Windows).
 let lastVitalsMtime = 0;

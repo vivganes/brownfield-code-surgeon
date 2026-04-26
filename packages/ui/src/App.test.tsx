@@ -71,15 +71,15 @@ describe("App", () => {
 
   it("shows '—' for run id when vitals is null", () => {
     render(<App />);
-    expect(screen.getByText(/run:/)).toBeInTheDocument();
+    expect(screen.getByText(/Run ID/)).toBeInTheDocument();
     expect(screen.getAllByText(/—/).length).toBeGreaterThanOrEqual(2);
   });
 
   it("shows the run id and engine from vitals when present", () => {
     streamState.vitals = vitalsFixture({ runId: "run-xyz", engine: "sdk" });
     render(<App />);
-    expect(screen.getByText("run:", { exact: false })).toHaveTextContent("run-xyz");
-    expect(screen.getByText("engine:", { exact: false })).toHaveTextContent("sdk");
+    expect(screen.getByText(/Run ID/).closest(".hud-readout")).toHaveTextContent("run-xyz");
+    expect(screen.getByText(/Engine/).closest(".hud-readout")).toHaveTextContent("sdk");
   });
 
   it("shows 'offline' when stream is disconnected", () => {

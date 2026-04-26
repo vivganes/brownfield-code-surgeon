@@ -8,7 +8,7 @@ const TheatreScene = lazy(() =>
 );
 
 export function App(): JSX.Element {
-  const { connected, vitals, events } = useSurgeryStream();
+  const { connected, vitals, events, planReady, seamsReady } = useSurgeryStream();
 
   const approve = async (phase: Phase): Promise<void> => {
     try {
@@ -77,6 +77,8 @@ export function App(): JSX.Element {
             events={events}
             engine={vitals?.engine ?? "sdk"}
             onApprove={approve}
+            planReady={planReady}
+            seamsReady={seamsReady}
           />
         </Suspense>
       </div>

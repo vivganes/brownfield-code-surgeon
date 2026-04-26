@@ -85,7 +85,7 @@ describe("SettingsModal", () => {
     const envSelect = screen.getByRole("combobox");
     fireEvent.change(envSelect, { target: { value: "env_abc" } });
 
-    fireEvent.click(screen.getByText("Save"));
+    fireEvent.click(screen.getByText("💾 SAVE CONFIG"));
     await waitFor(() => expect(capturedBody).toBeDefined());
     const parsed = JSON.parse(capturedBody!);
     expect(parsed).toEqual({ githubToken: "ghp_xyz", agentEnvId: "env_abc" });

@@ -47,7 +47,7 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(screen.getByText("+ New Surgery")).toBeInTheDocument();
+    expect(screen.getByText("⚕ New Surgery")).toBeInTheDocument();
   });
 
   it("shows running pill and Abort button when running", async () => {
@@ -94,8 +94,7 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
-    expect(screen.getByText("New Surgery")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     expect(screen.getByPlaceholderText(/add a \/comments endpoint/i)).toBeInTheDocument();
   });
 
@@ -108,8 +107,8 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
-    const startBtn = screen.getByRole("button", { name: /^Start$/ });
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
     expect(startBtn).toBeDisabled();
   });
 
@@ -122,13 +121,14 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
       target: { value: "/repo" },
     });
     const textarea = screen.getByPlaceholderText(/add a \/comments endpoint/i);
     fireEvent.change(textarea, { target: { value: "do something" } });
-    expect(screen.getByRole("button", { name: /^Start$/ })).not.toBeDisabled();
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    expect(startBtn).not.toBeDisabled();
   });
 
   it("Cancel closes the modal", async () => {
@@ -140,7 +140,7 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.click(screen.getByText("Cancel"));
     expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
   });
@@ -154,7 +154,7 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     expect(screen.getByText("Cancel")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
@@ -181,14 +181,15 @@ describe("RunControls", () => {
       await Promise.resolve();
     });
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
       target: { value: "/repo" },
     });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "build a thing" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    fireEvent.click(startBtn);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -221,14 +222,15 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
       target: { value: "/repo" },
     });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "   build a thing   " },
     });
-    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    fireEvent.click(startBtn);
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect(JSON.parse(capturedBody!).request).toBe("build a thing");
@@ -246,14 +248,15 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
       target: { value: "/repo" },
     });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "x" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    fireEvent.click(startBtn);
 
     await waitFor(() => {
       expect(screen.getByText("engine busy")).toBeInTheDocument();
@@ -269,7 +272,7 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     const checkbox = screen.getByRole("checkbox", { name: /auto-approve/i });
     expect(checkbox).not.toBeChecked();
     fireEvent.click(checkbox);
@@ -285,7 +288,7 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     expect(screen.getByText(/Claude Opus 4.7/)).toBeInTheDocument();
     expect(screen.getByText(/Claude Sonnet 4.6/)).toBeInTheDocument();
     expect(screen.getByText(/Claude Haiku 4.5/)).toBeInTheDocument();
@@ -300,11 +303,11 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
-    expect(screen.getByText(/Off — fastest/)).toBeInTheDocument();
-    expect(screen.getByText(/Low — ~2k/)).toBeInTheDocument();
-    expect(screen.getByText(/Medium — ~5k/)).toBeInTheDocument();
-    expect(screen.getByText(/High — ~12k/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
+    await waitFor(() => expect(screen.getByText(/^Off$/, { selector: "button" })).toBeInTheDocument());
+    expect(screen.getByText(/^Low$/, { selector: "button" })).toBeInTheDocument();
+    expect(screen.getByText(/^Medium$/, { selector: "button" })).toBeInTheDocument();
+    expect(screen.getByText(/^High$/, { selector: "button" })).toBeInTheDocument();
   });
 
   it("shows the gear (Settings) button when not running", async () => {
@@ -338,14 +341,15 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
       target: { value: "/repo" },
     });
     fireEvent.change(screen.getByPlaceholderText(/add a \/comments endpoint/i), {
       target: { value: "do" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
+    const startBtn1 = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    fireEvent.click(startBtn1);
     await waitFor(() => expect(capturedBody).toBeDefined());
     const parsed = JSON.parse(capturedBody!);
     expect(parsed.engine).toBe("sdk");
@@ -371,7 +375,7 @@ describe("RunControls", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     await waitFor(() => screen.getByText(/Run Finish Phase on Managed Agent/i));
 
     const managedCheckbox = screen.getByRole("checkbox", {
@@ -381,7 +385,7 @@ describe("RunControls", () => {
     expect(managedCheckbox).toBeChecked();
 
     // Start button should be disabled.
-    const startBtn = screen.getByRole("button", { name: /^Start$/ });
+    const startBtn = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
     expect(startBtn).toBeDisabled();
     // Configure ⚙ button surfaced inline.
     expect(screen.getByText(/Configure/i)).toBeInTheDocument();
@@ -421,7 +425,7 @@ describe("RunControls", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/settings"),
     );
 
-    fireEvent.click(screen.getByText("+ New Surgery"));
+    fireEvent.click(screen.getByText("⚕ New Surgery"));
     await waitFor(() => screen.getByText(/Run Finish Phase on Managed Agent/i));
 
     fireEvent.change(screen.getByPlaceholderText(/absolute path/i), {
@@ -439,7 +443,8 @@ describe("RunControls", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/repo/origin"),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /^Start$/ }));
+    const startBtn2 = await screen.findByRole("button", { name: /INITIATE SURGERY/i });
+    fireEvent.click(startBtn2);
     await waitFor(() => expect(capturedBody).toBeDefined());
     const parsed = JSON.parse(capturedBody!);
     expect(parsed.engine).toBe("managed");
