@@ -1,12 +1,12 @@
 {
   "name": "brownfield-code-surgeon",
   "description": "A safety-first, seven-phase brownfield workflow for Claude Code. Seven expert subagents (Plan, Map, Break, Cover, Implement, Refactor, Finish) with phase-aware forbidden-move enforcement via hooks.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": {
     "name": "Vivek Ganesan"
   },
-  "homepage": "https://github.com/ampyard/brownfield-code-surgeon",
-  "repository": "https://github.com/ampyard/brownfield-code-surgeon",
+  "homepage": "https://github.com/vivganes/brownfield-code-surgeon",
+  "repository": "https://github.com/vivganes/brownfield-code-surgeon",
   "license": "MIT",
   "keywords": [
     "refactoring",

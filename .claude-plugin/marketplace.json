@@ -4,7 +4,10 @@
     "name": "Vivek Ganesan",
     "email": "caliberoviv@gmail.com"
   },
-  "description": "Plugins and tooling that productionize the seven-phase brownfield code-surgery workflow.",
+  "metadata": {
+    "description": "Plugins and tooling that productionize the seven-phase brownfield code-surgery workflow.",
+    "version": "1.0.0"
+  },
   "plugins": [
     {
       "name": "brownfield-code-surgeon",
