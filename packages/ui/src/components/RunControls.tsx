@@ -643,7 +643,7 @@ function NewSurgeryModal({
               <span>
                 Run Finish Phase on Managed Agent
                 <span style={{ display: "block", fontSize: 11, opacity: 0.7 }}>
-                  Runs only the finish phase in an Anthropic Managed-Agents environment. Earlier phases run locally.
+                  Hands-off the finish phase to an Anthropic Managed-Agents environment. Earlier phases run locally.
                 </span>
               </span>
             </label>
