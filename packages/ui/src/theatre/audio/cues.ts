@@ -19,6 +19,7 @@ const TICK_FREQ: Record<string, number> = {
 export function useEventCues(events: SurgeryEvent[], enabled: boolean): void {
   const lastIndex = useRef(0);
   const approvalsOpen = useRef(new Set<string>());
+  const hurtMeowRunId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -33,6 +34,10 @@ export function useEventCues(events: SurgeryEvent[], enabled: boolean): void {
       switch (ev.type) {
         case "PhaseStart":
           engine.phaseStart();
+          if (ev.phase === "plan" && ev.runId !== hurtMeowRunId.current) {
+            hurtMeowRunId.current = ev.runId;
+            engine.hurtMeow();
+          }
           break;
         case "ArtifactWritten":
           engine.artifactThunk();

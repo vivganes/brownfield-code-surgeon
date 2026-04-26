@@ -1,6 +1,7 @@
 type OscType = OscillatorNode["type"];
 
 const MEOW_URL = "/sounds/meow.mp3";
+const HURT_MEOW_URL = "/sounds/hurt-meow.mp3";
 
 export class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -11,6 +12,8 @@ export class SoundEngine {
   private volume = 0.5;
   private meowBuffer: AudioBuffer | null = null;
   private meowLoading: Promise<void> | null = null;
+  private hurtMeowBuffer: AudioBuffer | null = null;
+  private hurtMeowLoading: Promise<void> | null = null;
 
   async start(): Promise<void> {
     if (this.ctx) {
@@ -140,6 +143,26 @@ export class SoundEngine {
     g.gain.value = 0.9;
     src.connect(g).connect(master);
     src.start();
+  }
+
+  hurtMeow(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    if (this.hurtMeowBuffer) {
+      this.playMeowBuffer(ctx, master, this.hurtMeowBuffer);
+      return;
+    }
+    if (this.hurtMeowLoading) return;
+    this.hurtMeowLoading = fetch(HURT_MEOW_URL)
+      .then((r) => r.arrayBuffer())
+      .then((ab) => ctx.decodeAudioData(ab))
+      .then((buf) => {
+        this.hurtMeowBuffer = buf;
+        if (this.master) this.playMeowBuffer(ctx, this.master, buf);
+      })
+      .catch(() => {})
+      .finally(() => { this.hurtMeowLoading = null; });
   }
 
   finishChord(): void {

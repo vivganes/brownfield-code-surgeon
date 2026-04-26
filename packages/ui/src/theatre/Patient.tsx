@@ -73,7 +73,8 @@ export function Patient({
 }: PatientProps): JSX.Element {
   const groupRef = useRef<THREE.Group>(null);
   const bodyGroupRef = useRef<THREE.Group>(null);
-  const sideRot = useRef(0);
+  // Start already lying down — the cat arrives sick, it doesn't collapse in front of the user.
+  const sideRot = useRef(Math.PI / 2);
 
   // Pre-surgery: no run is in progress and nothing has finished in this UI
   // session. Stale "completed" phaseStatus from a previous run on disk would
@@ -135,10 +136,11 @@ export function Patient({
       g.position.y = TABLE_TOP_Y;
     }
 
-    const targetSide = (phase === "plan" || phase === "map") ? Math.PI / 2 : 0;
+    const targetSide = (phase === null && finishedTs === 0) || phase === "plan" || phase === "map" ? Math.PI / 2 : 0;
     sideRot.current = THREE.MathUtils.damp(sideRot.current, targetSide, 2.0, dt);
     if (bodyGroupRef.current) {
       bodyGroupRef.current.rotation.z = sideRot.current;
+      bodyGroupRef.current.position.y = Math.sin(sideRot.current) * 0.3;
     }
   });
 
@@ -198,7 +200,7 @@ function CatModel({
   // the cached gltf. Capture original colours so we can re-tint each frame.
   // Auto-fit: compute bbox and derive a uniform scale so the cat's longest
   // axis equals CAT_TARGET_LENGTH, and lift it so its feet rest on y=0.
-  const { instance, tinted, autoScale, autoLift } = useMemo(() => {
+  const { instance, tinted, eyeBones, autoScale, autoLift } = useMemo(() => {
     // Use the loaded scene directly. We only render one Patient, so sharing
     // the cached gltf hierarchy is safe. We DO clone materials below so that
     // per-frame tinting is per-instance and survives unmount/remount.
@@ -236,7 +238,7 @@ function CatModel({
     // After scaling, lift so the bottom sits at y=0.
     const lift = -box.min.y * scale;
 
-    void lift;
+    void lift; void autoScale;
 
     // Bake scale onto the root and rebuild matrices, then recompute the
     // post-bake bbox so we can lift correctly. Parent-scaling a SkinnedMesh
@@ -247,9 +249,18 @@ function CatModel({
     const bakedBox = new THREE.Box3().setFromObject(root);
     const bakedLift = -bakedBox.min.y;
 
+    type EyeBone = { bone: THREE.Bone; restX: number };
+    const eyeBones: EyeBone[] = [];
+    root.traverse(o => {
+      if (o.name === "eyeL_022" || o.name === "eyeR_023") {
+        const bone = o as THREE.Bone;
+        eyeBones.push({ bone, restX: bone.rotation.x });
+      }
+    });
     return {
       instance: root,
       tinted: tintedMats,
+      eyeBones,
       autoScale: scale,
       autoLift: bakedLift,
     };
@@ -266,8 +277,11 @@ function CatModel({
     }
   }, [actions]);
 
-  // Drive tint, emissive, and animation speed from health each frame.
+  // Drive tint, emissive, animation speed, and eye blink from health each frame.
   const currentHealth = useRef(0);
+  // Blink: fires every ~10s with ±2s jitter. Duration: 0.15s (close then open).
+  const blinkTimer = useRef(4 + Math.random() * 4);
+  const blinkPhase = useRef<number | null>(null);
   useFrame((_, dt) => {
     currentHealth.current = THREE.MathUtils.damp(
       currentHealth.current,
@@ -304,6 +318,32 @@ function CatModel({
       );
     }
     mixer.update(dt);
+
+    // Eye blink via eye bones.
+    if (eyeBones.length > 0) {
+      blinkTimer.current -= dt;
+      if (blinkTimer.current <= 0 && blinkPhase.current === null) {
+        blinkPhase.current = 0;
+        blinkTimer.current = 4 + Math.random() * 4;
+      }
+      if (blinkPhase.current !== null) {
+        blinkPhase.current += dt;
+        const CLOSE = 0.07;
+        const OPEN = 0.14;
+        let t: number;
+        if (blinkPhase.current < CLOSE) {
+          t = blinkPhase.current / CLOSE;            // 0→1 closing
+        } else if (blinkPhase.current < OPEN) {
+          t = 1 - (blinkPhase.current - CLOSE) / (OPEN - CLOSE); // 1→0 opening
+        } else {
+          t = 0;
+          blinkPhase.current = null;
+        }
+        for (const { bone, restX } of eyeBones) {
+          bone.rotation.x = restX + t * 1.2;
+        }
+      }
+    }
   });
 
   return (
@@ -640,11 +680,11 @@ function LaserScan(): JSX.Element {
     const m = ref.current;
     if (!m) return;
     const t = clock.elapsedTime;
-    m.position.x = Math.sin(t * 1.6) * 0.55;
+    m.position.x = -0.4 + Math.sin(t * 1.6) * 0.55;
   });
   // Tall vertical sheet covering the cat from feet (y≈0) to head (y≈1.5).
   return (
-    <mesh ref={ref} position={[0, 0.78, 0]}>
+    <mesh ref={ref} position={[0, 0.78, 0.55]}>
       <planeGeometry args={[0.025, 1.7]} />
       <meshBasicMaterial
         color="#7cf0ff"

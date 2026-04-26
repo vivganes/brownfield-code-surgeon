@@ -1,6 +1,7 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
 import type { Phase, SurgeryEvent, Vitals } from "../types";
 import { PHASES } from "../types";
 import { Room } from "./Room";
@@ -27,6 +28,40 @@ type SceneProps = {
 
 const INITIAL_CAMERA: [number, number, number] = [0, 1.9, 7.5];
 const INITIAL_TARGET: [number, number, number] = [0, 2.0, -3];
+const INTRO_START: [number, number, number] = [0, 5, 18];
+const INTRO_DURATION = 2.8; // seconds
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function CinematicIntro({ onDone }: { onDone: () => void }): null {
+  const { camera } = useThree();
+  const progress = useRef(0);
+  const done = useRef(false);
+  const from = useRef(new THREE.Vector3(...INTRO_START));
+  const to = useRef(new THREE.Vector3(...INITIAL_CAMERA));
+  const lookAt = useRef(new THREE.Vector3(...INITIAL_TARGET));
+
+  useEffect(() => {
+    camera.position.copy(from.current);
+    camera.lookAt(lookAt.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useFrame((_, dt) => {
+    if (done.current) return;
+    progress.current = Math.min(1, progress.current + dt / INTRO_DURATION);
+    const t = easeOutCubic(progress.current);
+    camera.position.lerpVectors(from.current, to.current, t);
+    camera.lookAt(lookAt.current);
+    if (progress.current >= 1) {
+      done.current = true;
+      onDone();
+    }
+  });
+
+  return null;
+}
 
 export function TheatreScene({
   vitals,
@@ -52,6 +87,7 @@ export function TheatreScene({
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const [introComplete, setIntroComplete] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [ackFinishTs, setAckFinishTs] = useState(0);
   const effectiveFinishedTs =
@@ -107,8 +143,10 @@ export function TheatreScene({
         camera={{ position: INITIAL_CAMERA, fov: 58 }}
         style={{ background: "#05070e" }}
       >
+        {!introComplete && <CinematicIntro onDone={() => setIntroComplete(true)} />}
         <OrbitControls
           ref={controlsRef}
+          enabled={introComplete}
           target={INITIAL_TARGET}
           enablePan
           enableZoom
@@ -288,11 +326,7 @@ export function TheatreScene({
       >
         <div>
           <span style={{ color: "#5eead4" }}>drag</span> rotate ·{" "}
-          <span style={{ color: "#5eead4" }}>right-drag</span> pan ·{" "}
           <span style={{ color: "#5eead4" }}>wheel</span> zoom
-        </div>
-        <div style={{ marginTop: 4, fontSize: 9, color: "#4a5278" }}>
-          patient model: "Toon Cat FREE" by Omabuarts Studio · CC-BY-4.0
         </div>
       </div>
     </div>
