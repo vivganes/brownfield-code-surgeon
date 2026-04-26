@@ -36,7 +36,7 @@ export function useEventCues(events: SurgeryEvent[], enabled: boolean): void {
           engine.phaseStart();
           if (ev.phase === "plan" && ev.runId !== hurtMeowRunId.current) {
             hurtMeowRunId.current = ev.runId;
-            engine.hurtMeow();
+            setTimeout(() => engine.hurtMeow(), 3000);
           }
           break;
         case "ArtifactWritten":

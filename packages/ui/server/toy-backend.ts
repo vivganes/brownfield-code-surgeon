@@ -136,7 +136,9 @@ const SCRIPTS: Record<Phase, PhaseScript> = {
   plan: {
     toolUses: [
       { tool: "Read", summary: "Inspecting repo structure" },
+      { tool: "Glob", summary: "Scanning file tree for entry points" },
       { tool: "Grep", summary: "Searching for entry points" },
+      { tool: "Read", summary: "Reading package.json dependencies" },
       { tool: "Write", summary: "Drafting surgical plan" },
     ],
     artifacts: [{ path: ARTIFACT_PATHS.plan, bytes: 1840, kind: "plan" }],
