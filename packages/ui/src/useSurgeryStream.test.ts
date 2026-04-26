@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Vitals } from "./types.js";
 
 // Mock the EventSource since it's not available in jsdom
 class MockEventSource {
@@ -79,8 +80,8 @@ describe("useSurgeryStream", () => {
     events.push(event2);
 
     expect(events).toHaveLength(2);
-    expect(events[0].type).toBe("PhaseStart");
-    expect(events[1].type).toBe("PhaseEnd");
+    expect(events[0]!.type).toBe("PhaseStart");
+    expect(events[1]!.type).toBe("PhaseEnd");
   });
 
   it("should handle concurrent event streams", () => {
@@ -121,10 +122,10 @@ describe("useSurgeryStream", () => {
   });
 
   it("should handle null vitals gracefully", () => {
-    const vitals = null;
+    const vitals: Vitals | null = null;
     expect(vitals).toBeNull();
 
-    const runId = vitals?.runId ?? "unknown";
+    const runId = (vitals as Vitals | null)?.runId ?? "unknown";
     expect(runId).toBe("unknown");
   });
 

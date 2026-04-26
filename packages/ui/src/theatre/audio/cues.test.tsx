@@ -42,7 +42,7 @@ describe("useEventCues", () => {
 
   it("does nothing when disabled", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: ts(0), phase: "plan" },
+      { type: "PhaseStart", timestamp: ts(0), phase: "plan", engine: "sdk", runId: "test-run" },
     ];
     render(<Harness events={events} enabled={false} />);
     expect(engineMock.tick).not.toHaveBeenCalled();
@@ -51,8 +51,8 @@ describe("useEventCues", () => {
 
   it("ticks once per event", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: ts(0), phase: "plan" },
-      { type: "PhaseEnd", timestamp: ts(1), phase: "plan", outcome: "completed", durationMs: 10 },
+      { type: "PhaseStart", timestamp: ts(0), phase: "plan", engine: "sdk", runId: "test-run" },
+      { type: "PhaseEnd", timestamp: ts(1), phase: "plan", outcome: "completed", durationMs: 10, engine: "sdk", runId: "test-run" },
     ];
     render(<Harness events={events} enabled={true} />);
     expect(engineMock.tick).toHaveBeenCalledTimes(2);
@@ -60,7 +60,7 @@ describe("useEventCues", () => {
 
   it("calls phaseStart() for PhaseStart events", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: ts(0), phase: "plan" },
+      { type: "PhaseStart", timestamp: ts(0), phase: "plan", engine: "sdk", runId: "test-run" },
     ];
     render(<Harness events={events} enabled={true} />);
     expect(engineMock.phaseStart).toHaveBeenCalledTimes(1);
@@ -75,6 +75,8 @@ describe("useEventCues", () => {
         path: "plan.md",
         kind: "plan",
         reason: "x",
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
     ];
     render(<Harness events={events} enabled={true} />);
@@ -97,6 +99,8 @@ describe("useEventCues", () => {
                   phase: "plan",
                   summary: "x",
                   artifacts: [],
+                  engine: "sdk",
+                  runId: "test-run",
                 } as SurgeryEvent,
               ])
             }
@@ -112,6 +116,8 @@ describe("useEventCues", () => {
                   timestamp: ts(1),
                   phase: "plan",
                   approvedBy: "human",
+                  engine: "sdk",
+                  runId: "test-run",
                 } as SurgeryEvent,
               ])
             }
@@ -147,6 +153,8 @@ describe("useEventCues", () => {
                   phase: "plan",
                   summary: "x",
                   artifacts: [],
+                  engine: "sdk",
+                  runId: "test-run",
                 } as SurgeryEvent,
                 {
                   type: "ApprovalRequested",
@@ -154,6 +162,8 @@ describe("useEventCues", () => {
                   phase: "map",
                   summary: "x",
                   artifacts: [],
+                  engine: "sdk",
+                  runId: "test-run",
                 } as SurgeryEvent,
               ])
             }
@@ -169,6 +179,8 @@ describe("useEventCues", () => {
                   timestamp: ts(2),
                   phase: "plan",
                   approvedBy: "human",
+                  engine: "sdk",
+                  runId: "test-run",
                 } as SurgeryEvent,
               ])
             }
@@ -197,6 +209,8 @@ describe("useEventCues", () => {
         failed: 0,
         skipped: 0,
         total: 5,
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
       {
         type: "TestRun",
@@ -206,6 +220,8 @@ describe("useEventCues", () => {
         failed: 1,
         skipped: 0,
         total: 5,
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
     ];
     render(<Harness events={events} enabled={true} />);
@@ -220,6 +236,8 @@ describe("useEventCues", () => {
         phase: "plan",
         outcome: "completed",
         durationMs: 1,
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
       {
         type: "PhaseEnd",
@@ -227,6 +245,8 @@ describe("useEventCues", () => {
         phase: "finish",
         outcome: "completed",
         durationMs: 1,
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
     ];
     render(<Harness events={events} enabled={true} />);
@@ -237,7 +257,7 @@ describe("useEventCues", () => {
   it("only emits cues for newly added events between renders", () => {
     function Stream() {
       const [events, setEvents] = React.useState<SurgeryEvent[]>([
-        { type: "PhaseStart", timestamp: ts(0), phase: "plan" },
+        { type: "PhaseStart", timestamp: ts(0), phase: "plan", engine: "sdk", runId: "test-run" },
       ]);
       useEventCues(events, true);
       return (
@@ -245,7 +265,7 @@ describe("useEventCues", () => {
           onClick={() =>
             setEvents((p) => [
               ...p,
-              { type: "PhaseStart", timestamp: ts(1), phase: "map" },
+              { type: "PhaseStart", timestamp: ts(1), phase: "map", engine: "sdk", runId: "test-run" },
             ])
           }
         >

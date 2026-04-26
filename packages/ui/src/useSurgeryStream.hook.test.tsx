@@ -24,6 +24,7 @@ describe("useSurgeryStream hook patterns", () => {
                 engine: "sdk",
                 currentPhase: "plan",
                 repoRoot: "/repo",
+                startedAt: new Date().toISOString(),
                 lastUpdated: new Date().toISOString(),
                 phaseStatus: {
                   plan: "running" as const,
@@ -34,6 +35,14 @@ describe("useSurgeryStream hook patterns", () => {
                   refactor: "pending" as const,
                   finish: "pending" as const,
                 },
+                tests: { total: 100, passing: 95, failing: 5, skipped: 0 },
+                coverage: {
+                  baseline: { statements: 70.2 },
+                  current: { statements: 75.5 },
+                },
+                seamsFound: 0,
+                dependenciesBroken: 0,
+                artifacts: [],
               })
             }
           >
@@ -46,6 +55,8 @@ describe("useSurgeryStream hook patterns", () => {
                   type: "PhaseStart" as const,
                   timestamp: new Date().toISOString(),
                   phase: "plan" as const,
+                  engine: "sdk" as const,
+                  runId: "test-run",
                 },
               ])
             }
@@ -95,6 +106,8 @@ describe("useSurgeryStream hook patterns", () => {
                 type: "PhaseStart" as const,
                 timestamp: new Date().toISOString(),
                 phase: "plan" as const,
+                engine: "sdk" as const,
+                runId: "test-run",
               })
             }
           >
@@ -131,6 +144,8 @@ describe("useSurgeryStream hook patterns", () => {
       type: "PhaseStart",
       timestamp: new Date(Date.now() - 5000).toISOString(),
       phase: "plan",
+      engine: "sdk",
+      runId: "test-run",
     };
 
     const event2: SurgeryEvent = {
@@ -140,14 +155,16 @@ describe("useSurgeryStream hook patterns", () => {
       path: "plan.md",
       kind: "plan",
       reason: "initial",
+      engine: "sdk",
+      runId: "test-run",
     };
 
     events.push(event1);
     events.push(event2);
 
     expect(events).toHaveLength(2);
-    expect(events[0].type).toBe("PhaseStart");
-    expect(events[1].type).toBe("ArtifactWritten");
+    expect(events[0]!.type).toBe("PhaseStart");
+    expect(events[1]!.type).toBe("ArtifactWritten");
   });
 
   // Test the connection retry pattern
@@ -187,6 +204,8 @@ describe("useSurgeryStream hook patterns", () => {
       type: "PhaseStart",
       timestamp: new Date().toISOString(),
       phase: "plan",
+      engine: "sdk",
+      runId: "test-run",
     };
 
     expect(minimalEvent.type).toBe("PhaseStart");
@@ -233,6 +252,7 @@ describe("useSurgeryStream hook patterns", () => {
       engine: "sdk",
       currentPhase: null,
       repoRoot: "/repo",
+      startedAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
       phaseStatus: {
         plan: "pending",
@@ -243,6 +263,14 @@ describe("useSurgeryStream hook patterns", () => {
         refactor: "pending",
         finish: "pending",
       },
+      tests: { total: 100, passing: 95, failing: 5, skipped: 0 },
+      coverage: {
+        baseline: { statements: 70.2 },
+        current: { statements: 75.5 },
+      },
+      seamsFound: 0,
+      dependenciesBroken: 0,
+      artifacts: [],
     };
 
     const displayPhase = vitals.currentPhase ?? "idle";

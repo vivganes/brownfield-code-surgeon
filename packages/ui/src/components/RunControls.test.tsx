@@ -461,7 +461,7 @@ describe("RunControls", () => {
     (globalThis as any).fetch = fetchMock;
 
     const statusCallCount = (): number =>
-      fetchMock.mock.calls.filter((c) => c[0] === "/api/run/status").length;
+      fetchMock.mock.calls.filter((c) => (c as any[])[0] === "/api/run/status").length;
 
     render(<RunControls />);
     await act(async () => {

@@ -8,6 +8,7 @@ describe("deriveTheatreState", () => {
     engine: "sdk",
     currentPhase: "plan",
     repoRoot: "/home/user/repo",
+    startedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
     phaseStatus: {
       plan: "pending",
@@ -18,6 +19,14 @@ describe("deriveTheatreState", () => {
       refactor: "pending",
       finish: "pending",
     },
+    tests: { total: 100, passing: 95, failing: 5, skipped: 0 },
+    coverage: {
+      baseline: { statements: 70.2 },
+      current: { statements: 75.5 },
+    },
+    seamsFound: 0,
+    dependenciesBroken: 0,
+    artifacts: [],
     ...overrides,
   });
 
@@ -63,7 +72,10 @@ describe("deriveTheatreState", () => {
         timestamp,
         phase: "plan",
         path: "plan/plan.md",
+        kind: "plan",
         reason: "initial plan",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -81,6 +93,8 @@ describe("deriveTheatreState", () => {
         phase: "cover",
         passed: 5,
         failed: 2,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -96,6 +110,8 @@ describe("deriveTheatreState", () => {
         phase: "cover",
         passed: 10,
         failed: 0,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -111,6 +127,8 @@ describe("deriveTheatreState", () => {
         timestamp,
         phase: "finish",
         duration: 125,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -125,7 +143,10 @@ describe("deriveTheatreState", () => {
         timestamp: "invalid-date",
         phase: "plan",
         path: "test.md",
+        kind: "plan",
         reason: "test",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -144,21 +165,30 @@ describe("deriveTheatreState", () => {
         timestamp: t1,
         phase: "plan",
         path: "plan.md",
+        kind: "plan",
         reason: "v1",
+        engine: "sdk",
+        runId: "test-run",
       },
       {
         type: "ArtifactWritten",
         timestamp: t3,
         phase: "map",
         path: "seams.md",
+        kind: "seams",
         reason: "v2",
+        engine: "sdk",
+        runId: "test-run",
       },
       {
         type: "ArtifactWritten",
         timestamp: t2,
         phase: "plan",
         path: "plan.md",
+        kind: "plan",
         reason: "v3",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 
@@ -186,6 +216,8 @@ describe("deriveTheatreState", () => {
         phase: "cover",
         passed: 5,
         failed: 3,
+        engine: "sdk",
+        runId: "test-run",
       },
       {
         type: "TestRun",
@@ -193,6 +225,8 @@ describe("deriveTheatreState", () => {
         phase: "cover",
         passed: 8,
         failed: 1,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
 

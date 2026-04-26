@@ -34,6 +34,7 @@ function baseVitals(): Vitals {
     engine: "sdk",
     currentPhase: "cover",
     repoRoot: "/repo",
+    startedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
     phaseStatus: {
       plan: "completed",
@@ -43,6 +44,11 @@ function baseVitals(): Vitals {
       implement: "pending",
       refactor: "pending",
       finish: "pending",
+    },
+    tests: { total: 100, passing: 95, failing: 5, skipped: 0 },
+    coverage: {
+      baseline: { statements: 70.2 },
+      current: { statements: 75.5 },
     },
     seamsFound: 0,
     dependenciesBroken: 0,
@@ -60,9 +66,9 @@ describe("PatientStatusMonitor EcgTrace coverage", () => {
     rafSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation(
       (cb: FrameRequestCallback) => {
         rafCallbacks.push(cb);
-        return rafCallbacks.length;
+        return rafCallbacks.length as unknown as number;
       },
-    );
+    ) as any;
 
     ctx2d = makeCtx2d();
     // Override getContext to return our stub
@@ -112,6 +118,8 @@ describe("PatientStatusMonitor EcgTrace coverage", () => {
         type: "PhaseStart",
         timestamp: new Date().toISOString(),
         phase: "cover",
+        engine: "sdk",
+        runId: "test-run",
       } as SurgeryEvent,
     ];
     rerender(<PatientStatusMonitor vitals={baseVitals()} events={events2} />);

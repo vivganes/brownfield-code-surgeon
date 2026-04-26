@@ -48,6 +48,8 @@ let eventsWatcher: (() => void) | null = null;
 let planIntervalId: NodeJS.Timeout | null = null;
 let seamsIntervalId: NodeJS.Timeout | null = null;
 let vitalsIntervalId: NodeJS.Timeout | null = null;
+let planMdKnown = false;
+let seamsMdKnown = false;
 
 // Grep backtick-quoted filenames (anything with a file extension) from markdown,
 // return deduplicated basenames.
@@ -99,6 +101,8 @@ function stopWatchers(): void {
   planIntervalId = null;
   seamsIntervalId = null;
   vitalsIntervalId = null;
+  planMdKnown = false;
+  seamsMdKnown = false;
 }
 
 function startWatchers(): void {
@@ -113,7 +117,6 @@ function startWatchers(): void {
   });
 
   // Poll plan.md
-  let planMdKnown = false;
   fsp.stat(planMdPath).then(() => { planMdKnown = true; }).catch(() => {});
   planIntervalId = setInterval(async () => {
     try {
@@ -131,7 +134,6 @@ function startWatchers(): void {
   }, 500);
 
   // Poll seams.md
-  let seamsMdKnown = false;
   fsp.stat(seamsMdPath).then(() => { seamsMdKnown = true; }).catch(() => {});
   seamsIntervalId = setInterval(async () => {
     try {

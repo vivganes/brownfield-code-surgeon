@@ -49,6 +49,7 @@ describe("PatientStatusMonitor", () => {
     engine: "sdk",
     currentPhase: "cover",
     repoRoot: "/repo",
+    startedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
     phaseStatus: {
       plan: "completed",
@@ -67,13 +68,11 @@ describe("PatientStatusMonitor", () => {
       total: 100,
       passing: 95,
       failing: 5,
+      skipped: 0,
     },
     seamsFound: 3,
     dependenciesBroken: 1,
-    artifacts: [
-      { path: "plan/plan.md", lastUpdated: "" },
-      { path: "plan/seams.md", lastUpdated: "" },
-    ],
+    artifacts: ["plan/plan.md", "plan/seams.md"],
     ...overrides,
   });
 
@@ -106,7 +105,7 @@ describe("PatientStatusMonitor", () => {
     render(
       <PatientStatusMonitor
         vitals={createVitals({
-          tests: { total: 100, passing: 100, failing: 0 },
+          tests: { total: 100, passing: 100, failing: 0, skipped: 0 },
         })}
         events={[]}
       />,
@@ -128,7 +127,7 @@ describe("PatientStatusMonitor", () => {
     render(
       <PatientStatusMonitor
         vitals={createVitals({
-          coverage: { baseline: { statements: 70.2 } },
+          coverage: { baseline: { statements: 70.2 }, current: null },
         })}
         events={[]}
       />,
@@ -162,8 +161,8 @@ describe("PatientStatusMonitor", () => {
 
   it("displays event count", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "cover" },
-      { type: "PhaseEnd", timestamp: new Date().toISOString(), phase: "cover", duration: 100 },
+      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "cover", engine: "sdk", runId: "test-run" },
+      { type: "PhaseEnd", timestamp: new Date().toISOString(), phase: "cover", duration: 100, engine: "sdk", runId: "test-run" },
     ];
     render(<PatientStatusMonitor vitals={createVitals()} events={events} />);
     const twos = screen.getAllByText("2");

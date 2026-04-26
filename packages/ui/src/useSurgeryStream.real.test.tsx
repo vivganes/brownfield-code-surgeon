@@ -55,6 +55,7 @@ function Harness(): JSX.Element {
 const fullVitals = (overrides: Partial<Vitals> = {}): Vitals => ({
   runId: "run-1",
   engine: "sdk",
+  startedAt: new Date().toISOString(),
   currentPhase: null,
   repoRoot: "/repo",
   lastUpdated: new Date().toISOString(),
@@ -67,6 +68,11 @@ const fullVitals = (overrides: Partial<Vitals> = {}): Vitals => ({
     refactor: "pending",
     finish: "pending",
   },
+  tests: { total: 0, passing: 0, failing: 0, skipped: 0 },
+  coverage: { baseline: null, current: null },
+  seamsFound: 0,
+  dependenciesBroken: 0,
+  artifacts: [],
   ...overrides,
 });
 

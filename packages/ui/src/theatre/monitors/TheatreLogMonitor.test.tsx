@@ -17,7 +17,7 @@ describe("TheatreLogMonitor", () => {
 
   it("displays header with event count", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan" },
+      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan", engine: "sdk", runId: "test-run" },
     ];
     render(<TheatreLogMonitor events={events} />);
     expect(screen.getByText(/Surgical Log — Last 1/)).toBeInTheDocument();
@@ -28,6 +28,8 @@ describe("TheatreLogMonitor", () => {
       type: "PhaseStart" as const,
       timestamp: new Date(Date.now() - i * 1000).toISOString(),
       phase: "plan",
+      engine: "sdk",
+      runId: "test-run",
     }));
 
     render(<TheatreLogMonitor events={events} />);
@@ -36,7 +38,7 @@ describe("TheatreLogMonitor", () => {
 
   it("displays event type", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan" },
+      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan", engine: "sdk", runId: "test-run" },
     ];
     render(<TheatreLogMonitor events={events} />);
     expect(screen.getByText("PhaseStart")).toBeInTheDocument();
@@ -44,7 +46,7 @@ describe("TheatreLogMonitor", () => {
 
   it("displays event phase", () => {
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "cover" },
+      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "cover", engine: "sdk", runId: "test-run" },
     ];
     render(<TheatreLogMonitor events={events} />);
     expect(screen.getByText("cover")).toBeInTheDocument();
@@ -54,7 +56,7 @@ describe("TheatreLogMonitor", () => {
     const now = new Date();
     const isoString = now.toISOString();
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: isoString, phase: "plan" },
+      { type: "PhaseStart", timestamp: isoString, phase: "plan", engine: "sdk", runId: "test-run" },
     ];
     render(<TheatreLogMonitor events={events} />);
     const timeString = now.toLocaleTimeString([], { hour12: false });
@@ -70,6 +72,8 @@ describe("TheatreLogMonitor", () => {
         path: "plan/plan.md",
         kind: "plan",
         reason: "initial",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -83,6 +87,8 @@ describe("TheatreLogMonitor", () => {
         timestamp: new Date().toISOString(),
         phase: "implement",
         tool: "bash",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -97,6 +103,8 @@ describe("TheatreLogMonitor", () => {
         phase: "plan",
         tool: "bash",
         blocked: true,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -112,6 +120,8 @@ describe("TheatreLogMonitor", () => {
         passed: 95,
         total: 100,
         failed: 5,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -127,6 +137,8 @@ describe("TheatreLogMonitor", () => {
         passed: 100,
         total: 100,
         failed: 0,
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -141,6 +153,8 @@ describe("TheatreLogMonitor", () => {
         phase: "plan",
         duration: 125,
         outcome: "success",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -154,6 +168,8 @@ describe("TheatreLogMonitor", () => {
         timestamp: new Date().toISOString(),
         phase: "plan",
         request: "add feature X",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -168,6 +184,8 @@ describe("TheatreLogMonitor", () => {
         phase: "cover",
         before: { statements: 70.5 },
         after: { statements: 75.2 },
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -181,6 +199,8 @@ describe("TheatreLogMonitor", () => {
         timestamp: new Date().toISOString(),
         phase: "break",
         summary: "Safe to continue",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -194,6 +214,8 @@ describe("TheatreLogMonitor", () => {
         timestamp: new Date().toISOString(),
         phase: "break",
         approvedBy: "user@example.com",
+        engine: "sdk",
+        runId: "test-run",
       },
     ];
     render(<TheatreLogMonitor events={events} />);
@@ -205,6 +227,8 @@ describe("TheatreLogMonitor", () => {
       type: "PhaseStart" as const,
       timestamp: new Date(Date.now() - (30 - i) * 1000).toISOString(),
       phase: "plan",
+      engine: "sdk",
+      runId: "test-run",
     }));
 
     const { container } = render(<TheatreLogMonitor events={events} />);
@@ -218,7 +242,7 @@ describe("TheatreLogMonitor", () => {
     const { rerender } = render(<TheatreLogMonitor events={[]} />);
 
     const events: SurgeryEvent[] = [
-      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan" },
+      { type: "PhaseStart", timestamp: new Date().toISOString(), phase: "plan", engine: "sdk", runId: "test-run" },
     ];
 
     rerender(<TheatreLogMonitor events={events} />);
