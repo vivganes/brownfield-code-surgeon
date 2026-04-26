@@ -6,6 +6,16 @@ A package of tools that productionize the **seven-agent brownfield code-surgery 
 
 Author of this package is the original author of the paper mentioned above.
 
+## Screenshot
+
+![Screenshot of the Operation theatre UI with animated cat as patient](./screenshot.png)
+
+## Motivation
+
+AI coding assistants are more helpful in greenfield development than for modifying brownfield code — large, undertested, poorly-maintained systems that make up the majority of professional programming.
+
+This package aims to change that.  This package `brownfield-code-surgeon` will enable easily working with brownfield repositories using Claude code.
+
 ## One backbone, three user interface choices
 
 All interfaces read and write the same artifacts and emit the same events.
