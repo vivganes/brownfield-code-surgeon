@@ -2,7 +2,9 @@
 
 A package of tools that productionize the **seven-agent brownfield code-surgery workflow** — Plan, Map, Break, Cover, Implement, Refactor, Finish — from:
 
-> Ganesan, V., Sekar, K. R., & Kashyap, K. (2026). *Agentic Code Surgery for Brownfield Systems.* Zenodo. <https://zenodo.org/records/19640171>
+> Ganesan, Vivek, Kamal Raj Sekar, and Kiran Kashyap. '*Agentic Code Surgery for Brownfield Systems*'. Zenodo, 18 April 2026. https://doi.org/10.5281/zenodo.19640171 
+
+Author of this package is the original author of the paper mentioned above.
 
 ## One backbone, three user interface choices
 
@@ -18,7 +20,7 @@ Shared contracts live in `packages/shared`; the source-of-truth agent prompts li
 
 ## Setup
 
-### Environment Variables (Needed only if we use Managed runners)
+### Environment Variables (Needed only if you use Claude Managed Runners)
 
 Copy `.env.example` to `.env.local` and configure your credentials:
 

@@ -37,9 +37,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm run test
-
       - name: Generate coverage
         run: npm run test:coverage
 
@@ -47,8 +44,8 @@ jobs:
         run: |
           COVERAGE=$(jq '.total.lines.pct' coverage/coverage-summary.json)
           echo "Coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 85" | bc -l) )); then
-            echo "Coverage is below 85% threshold (${COVERAGE}%)"
+          if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+            echo "Coverage is below 90% threshold (${COVERAGE}%)"
             exit 1
           fi
 
