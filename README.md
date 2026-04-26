@@ -53,6 +53,22 @@ ANTHROPIC_AGENT_ENV_ID=env_...
 
 The `.env.local` file is git-ignored and will not be committed.
 
+
+## Evidence of Effectiveness of this Workflow
+
+The evidence of effectiveness can be seen by comparing pull requests [#33 - Regular Plan + Implement Approach](https://github.com/vivganes/kanbanstr/pull/33) and [#34 - Brownfield Surgery Claude Code Plugin](https://github.com/vivganes/kanbanstr/pull/34) of the [Kanbanstr](https://github.com/vivganes/kanbanstr) repo.
+
+Our workflow increased the coverage from 0.82% to 19.24% of lines, while implementing the same feature.
+
+This would mean:
+ - Less manual testing effort after the agent finishes
+ - Provably correct implementation
+ - Prevention of regression in the covered lines of code by anyone in the future
+  
+## Continuous Integration
+
+CI using Github Actions is enabled in this repository so that we maintain the quality continuously.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
