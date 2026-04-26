@@ -11,7 +11,7 @@ From the monorepo root:
 
 ```bash
 npm install
-npm run build -w @brownfield-surgeon/sdk-runner
+npm run build
 ```
 
 Set your API key:

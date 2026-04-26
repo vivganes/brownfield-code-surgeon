@@ -12,6 +12,15 @@ same artifacts lights up the same UI.
 
 ## Running
 
+First, build all workspace packages from the repo root:
+
+```bash
+npm install
+npm run build
+```
+
+Then start the dev server:
+
 ```bash
 # From the repo root:
 SURGERY_REPO_ROOT=/path/to/target-repo npm run dev -w @brownfield-surgeon/ui
