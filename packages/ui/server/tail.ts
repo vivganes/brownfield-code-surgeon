@@ -41,7 +41,12 @@ export function watchEventsFile(
           const trimmed = line.trim();
           if (!trimmed) continue;
           try {
-            const parsed = SurgeryEventSchema.parse(JSON.parse(trimmed));
+            const obj = JSON.parse(trimmed);
+            // Migrate old "unknown" phases to "plan" (pre-fix compatibility)
+            if (obj.phase === "unknown") {
+              obj.phase = "plan";
+            }
+            const parsed = SurgeryEventSchema.parse(obj);
             onEvent(parsed);
           } catch (err) {
             console.warn("[tail] skipping invalid event line:", err);

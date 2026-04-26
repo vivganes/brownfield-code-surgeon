@@ -10,7 +10,7 @@ This workflow is already published as a paper Zenodo titled [Agentic Code Surger
 Once you are in claude code, paste the following command and press enter.
 
 ```bash
-/plugin marketplace add vivganes/brownfield-code-surgery
+/plugin marketplace add vivganes/brownfield-code-surgeon
 ```
 
 Once this command succeeds, paste the following command and  press enter.

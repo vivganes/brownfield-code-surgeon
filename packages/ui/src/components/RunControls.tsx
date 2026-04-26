@@ -284,26 +284,49 @@ function NewSurgeryModal({
     setSubmitting(true);
     setError(null);
     try {
+      const trimmedWorkspace = workspace.trim();
+      const engine = runIn === "plugin" ? "plugin" : managedFinish ? "managed" : "sdk";
+
+      // Switch the server to watch the target workspace
+      const switchRes = await fetch("/api/watch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repoRoot: trimmedWorkspace }),
+      });
+      if (!switchRes.ok) {
+        const body = await switchRes.json().catch(() => ({}));
+        setError(body.error ?? `failed to switch directory: ${switchRes.status}`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Plugin mode: only observe, don't start a run (surgery is user-driven from Claude Code)
+      if (engine === "plugin") {
+        playCheck();
+        setSubmitting(false);
+        onClose();
+        return;
+      }
+
+      // SDK and Managed modes: start the surgery
       const payload: Record<string, unknown> = {
-        workspace: workspace.trim(),
-        engine: runIn === "plugin" ? "plugin" : managedFinish ? "managed" : "sdk",
+        workspace: trimmedWorkspace,
+        engine,
       };
 
-      if (runIn === "sdk") {
-        payload.request = request.trim();
-        payload.model = model;
-        payload.thinking = thinking;
-        payload.autoApprove = autoApprove;
-        payload.permissionMode = permissionMode;
-        const tools = allowedTools.split(",").map((s) => s.trim()).filter(Boolean);
-        if (tools.length > 0) payload.allowedTools = tools;
-        if (managedFinish) {
-          payload.managed = {
-            repoUrl: repoUrl.trim() || undefined,
-            baseBranch: baseBranch.trim() || undefined,
-            agentEnvId: settings?.agentEnvId ?? undefined,
-          };
-        }
+      payload.request = request.trim();
+      payload.model = model;
+      payload.thinking = thinking;
+      payload.autoApprove = autoApprove;
+      payload.permissionMode = permissionMode;
+      const tools = allowedTools.split(",").map((s) => s.trim()).filter(Boolean);
+      if (tools.length > 0) payload.allowedTools = tools;
+      if (managedFinish) {
+        payload.managed = {
+          repoUrl: repoUrl.trim() || undefined,
+          baseBranch: baseBranch.trim() || undefined,
+          agentEnvId: settings?.agentEnvId ?? undefined,
+        };
       }
 
       const res = await fetch("/api/run/start", {
@@ -488,7 +511,7 @@ function NewSurgeryModal({
                 </li>
                 <li style={{ marginBottom: 8 }}>
                   In Claude Code, run:
-                  <CommandBlock command="/plugin marketplace add vivganes/brownfield-code-surgery" />
+                  <CommandBlock command="/plugin marketplace add vivganes/brownfield-code-surgeon" />
                 </li>
                 <li style={{ marginBottom: 8 }}>
                   Then run:
@@ -720,6 +743,20 @@ function NewSurgeryModal({
             </div>
           )}
 
+          {runIn === "plugin" && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--muted)",
+                background: "rgba(94,234,212,0.04)",
+                border: "1px solid rgba(94,234,212,0.2)",
+                borderRadius: 4,
+                padding: "8px 10px",
+              }}
+            >
+              💡 Plugin Mode is user-driven. Set the workspace path above, then click "Observe Surgery" to start watching this directory. Run the surgery from Claude Code using the command shown.
+            </div>
+          )}
           {error && (
             <div
               style={{
@@ -764,7 +801,7 @@ function NewSurgeryModal({
             disabled={canSubmit}
             className="start-surgery-btn"
           >
-            {submitting ? "⏳ INITIATING…" : "⚡ INITIATE SURGERY"}
+            {submitting ? "⏳ INITIATING…" : runIn === "plugin" ? "👁 OBSERVE SURGERY" : "⚡ INITIATE SURGERY"}
           </button>
         </div>
       </div>

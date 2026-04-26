@@ -147,7 +147,7 @@ export function emptyVitals(repoRoot: string): Vitals {
 export type SurgeryEvent = Record<string, unknown> & {
   type: string;
   timestamp: string;
-  phase: Phase | "unknown";
+  phase: Phase;
   engine: "plugin" | "sdk" | "managed";
   runId: string;
 };
@@ -164,7 +164,7 @@ export function baseEvent(
   const vitals = readVitals(repoRoot);
   return {
     timestamp: new Date().toISOString(),
-    phase: (vitals?.currentPhase ?? "unknown") as Phase | "unknown",
+    phase: vitals?.currentPhase ?? "plan",
     engine: "plugin",
     runId: vitals?.runId ?? "no-run",
     ...extra,

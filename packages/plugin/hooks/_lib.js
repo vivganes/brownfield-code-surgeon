@@ -106,7 +106,7 @@ export function baseEvent(repoRoot, extra = {}) {
     const vitals = readVitals(repoRoot);
     return {
         timestamp: new Date().toISOString(),
-        phase: (vitals?.currentPhase ?? "unknown"),
+        phase: vitals?.currentPhase ?? "plan",
         engine: "plugin",
         runId: vitals?.runId ?? "no-run",
         ...extra,

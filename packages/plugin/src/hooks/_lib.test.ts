@@ -228,9 +228,9 @@ describe("appendEvent + baseEvent", () => {
     expect(parsed[1].tool).toBe("Write");
   });
 
-  it("baseEvent falls back to 'unknown' phase and 'no-run' when no vitals", () => {
+  it("baseEvent falls back to 'plan' phase and 'no-run' when no vitals", () => {
     const b = baseEvent(tmp);
-    expect(b.phase).toBe("unknown");
+    expect(b.phase).toBe("plan");
     expect(b.runId).toBe("no-run");
   });
 

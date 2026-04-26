@@ -42,6 +42,13 @@ const PORT = Number(process.env.SURGERY_UI_PORT ?? 7777);
 // Only use it when creating the client for managed environments — don't set env vars.
 const anthropicApiKey = resolveAnthropicApiKey();
 
+// Mutable state for dynamic repo switching
+let REPO_ROOT = path.resolve(process.env.SURGERY_REPO_ROOT ?? process.cwd());
+let eventsWatcher: (() => void) | null = null;
+let planIntervalId: NodeJS.Timeout | null = null;
+let seamsIntervalId: NodeJS.Timeout | null = null;
+let vitalsIntervalId: NodeJS.Timeout | null = null;
+
 // Grep backtick-quoted filenames (anything with a file extension) from markdown,
 // return deduplicated basenames.
 function extractSeamFiles(markdown: string): string[] {
@@ -53,8 +60,6 @@ function extractSeamFiles(markdown: string): string[] {
   }
   return [...seen];
 }
-
-const REPO_ROOT = path.resolve(process.env.SURGERY_REPO_ROOT ?? process.cwd());
 
 type SSEClient = {
   id: number;
@@ -83,6 +88,80 @@ function json(res: http.ServerResponse, status: number, body: unknown): void {
     "access-control-allow-origin": "*",
   });
   res.end(s);
+}
+
+function stopWatchers(): void {
+  if (eventsWatcher) eventsWatcher();
+  if (planIntervalId) clearInterval(planIntervalId);
+  if (seamsIntervalId) clearInterval(seamsIntervalId);
+  if (vitalsIntervalId) clearInterval(vitalsIntervalId);
+  eventsWatcher = null;
+  planIntervalId = null;
+  seamsIntervalId = null;
+  vitalsIntervalId = null;
+}
+
+function startWatchers(): void {
+  const eventsPath = eventsFile(REPO_ROOT);
+  const vitalsPath = vitalsFile(REPO_ROOT);
+  const planMdPath = planFile(REPO_ROOT);
+  const seamsMdPath = seamsFile(REPO_ROOT);
+
+  // Watch events file
+  eventsWatcher = watchEventsFile(eventsPath, (event: SurgeryEvent) => {
+    broadcast("event", event);
+  });
+
+  // Poll plan.md
+  let planMdKnown = false;
+  fsp.stat(planMdPath).then(() => { planMdKnown = true; }).catch(() => {});
+  planIntervalId = setInterval(async () => {
+    try {
+      await fsp.stat(planMdPath);
+      if (!planMdKnown) {
+        planMdKnown = true;
+        broadcast("plan-ready", {});
+      }
+    } catch {
+      if (planMdKnown) {
+        planMdKnown = false;
+        broadcast("plan-removed", {});
+      }
+    }
+  }, 500);
+
+  // Poll seams.md
+  let seamsMdKnown = false;
+  fsp.stat(seamsMdPath).then(() => { seamsMdKnown = true; }).catch(() => {});
+  seamsIntervalId = setInterval(async () => {
+    try {
+      await fsp.stat(seamsMdPath);
+      if (!seamsMdKnown) {
+        seamsMdKnown = true;
+        broadcast("seams-ready", {});
+      }
+    } catch {
+      if (seamsMdKnown) {
+        seamsMdKnown = false;
+        broadcast("seams-removed", {});
+      }
+    }
+  }, 500);
+
+  // Poll vitals.json
+  let lastVitalsMtime = 0;
+  vitalsIntervalId = setInterval(async () => {
+    try {
+      const stat = await fsp.stat(vitalsPath);
+      if (stat.mtimeMs !== lastVitalsMtime) {
+        lastVitalsMtime = stat.mtimeMs;
+        const v = await readVitals(REPO_ROOT);
+        if (v) broadcast("vitals", v);
+      }
+    } catch {
+      // vitals not written yet
+    }
+  }, 500);
 }
 
 async function sendFile(
@@ -144,10 +223,11 @@ function handleStream(req: http.IncomingMessage, res: http.ServerResponse): void
       }
       if (planMdKnown)  res.write(`event: plan-ready\ndata: {}\n\n`);
       if (seamsMdKnown) res.write(`event: seams-ready\ndata: {}\n\n`);
-      res.write("event: hello\ndata: {}\n\n");
     } catch (err) {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: String(err) })}\n\n`);
+      console.warn("[ui-server] error replaying state on stream connect:", err);
     }
+    // Always send hello to signal connection is live, regardless of whether we could read files
+    res.write("event: hello\ndata: {}\n\n");
   })();
 }
 
@@ -316,8 +396,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const body = await readBody(req).catch(() => "");
     let payload: any = {};
     try { payload = body ? JSON.parse(body) : {}; } catch { payload = {}; }
+    const engine =
+      payload.engine === "plugin" ||
+      payload.engine === "managed" ||
+      payload.engine === "sdk"
+        ? payload.engine
+        : "sdk";
     const request = typeof payload.request === "string" ? payload.request : "";
-    if (!request) {
+    // request is required for SDK and managed modes, but optional for plugin mode
+    // (plugin mode gets the request from the CLI, not the UI)
+    if (!request && engine !== "plugin") {
       json(res, 400, { error: "request is required" });
       return;
     }
@@ -326,12 +414,6 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         typeof payload.workspace === "string" && payload.workspace.trim()
           ? path.resolve(payload.workspace.trim())
           : REPO_ROOT;
-      const engine =
-        payload.engine === "plugin" ||
-        payload.engine === "managed" ||
-        payload.engine === "sdk"
-          ? payload.engine
-          : "sdk";
       const managed =
         engine === "managed" && payload.managed && typeof payload.managed === "object"
           ? {
@@ -382,6 +464,43 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
     return;
   }
+  if (pathname === "/api/watch" && req.method === "POST") {
+    const body = await readBody(req).catch(() => "");
+    let payload: any = {};
+    try { payload = body ? JSON.parse(body) : {}; } catch { payload = {}; }
+    const newRoot = typeof payload.repoRoot === "string" ? payload.repoRoot.trim() : "";
+    if (!newRoot) {
+      json(res, 400, { error: "repoRoot is required" });
+      return;
+    }
+    try {
+      const resolved = path.resolve(newRoot);
+      // Verify the directory exists
+      await fsp.stat(resolved);
+      // Switch to the new directory
+      stopWatchers();
+      REPO_ROOT = resolved;
+      startWatchers();
+      // Ensure .surgery dir exists
+      fs.mkdirSync(path.join(REPO_ROOT, ARTIFACT_PATHS.surgeryDir), { recursive: true });
+      console.log(`[ui-server] switched to watching repo: ${REPO_ROOT}`);
+      // Notify all clients to refresh state (new repo context)
+      broadcast("repo-switched", { repoRoot: REPO_ROOT });
+      // Send fresh vitals from new repo immediately
+      const freshVitals = await readVitals(REPO_ROOT);
+      console.log(`[ui-server] fresh vitals from ${REPO_ROOT}:`, freshVitals ? "found" : "not found");
+      if (freshVitals) {
+        broadcast("vitals", freshVitals);
+        console.log(`[ui-server] broadcast fresh vitals`);
+      } else {
+        console.log(`[ui-server] warning: no vitals.json in new repo`);
+      }
+      json(res, 200, { ok: true, repoRoot: REPO_ROOT });
+    } catch (err) {
+      json(res, 400, { error: String(err) });
+    }
+    return;
+  }
   if (pathname === "/api/run/abort" && req.method === "POST") {
     const ok = runManager.abort();
     json(res, ok ? 200 : 404, { ok, state: runManager.getState() });
@@ -413,67 +532,8 @@ server.listen(PORT, () => {
   console.log(`[ui-server] watching repo: ${REPO_ROOT}`);
 });
 
-// Start tailing the events file and rebroadcasting vitals changes.
-const eventsPath = eventsFile(REPO_ROOT);
-const vitalsPath = vitalsFile(REPO_ROOT);
-const planMdPath = planFile(REPO_ROOT);
-const seamsMdPath = seamsFile(REPO_ROOT);
-
-watchEventsFile(eventsPath, (event: SurgeryEvent) => {
-  broadcast("event", event);
-});
-
-// Poll plan.md — broadcast plan-ready on appearance, plan-removed on deletion.
-let planMdKnown = false;
-// Eagerly check so the flag is correct before any client connects.
-fsp.stat(planMdPath).then(() => { planMdKnown = true; }).catch(() => {});
-setInterval(async () => {
-  try {
-    await fsp.stat(planMdPath);
-    if (!planMdKnown) {
-      planMdKnown = true;
-      broadcast("plan-ready", {});
-    }
-  } catch {
-    if (planMdKnown) {
-      planMdKnown = false;
-      broadcast("plan-removed", {});
-    }
-  }
-}, 500);
-
-// Poll seams-and-dependencies.md — same pattern as plan.md.
-let seamsMdKnown = false;
-fsp.stat(seamsMdPath).then(() => { seamsMdKnown = true; }).catch(() => {});
-setInterval(async () => {
-  try {
-    await fsp.stat(seamsMdPath);
-    if (!seamsMdKnown) {
-      seamsMdKnown = true;
-      broadcast("seams-ready", {});
-    }
-  } catch {
-    if (seamsMdKnown) {
-      seamsMdKnown = false;
-      broadcast("seams-removed", {});
-    }
-  }
-}, 500);
-
-// Poll vitals.json (simpler and works cross-platform on Windows).
-let lastVitalsMtime = 0;
-setInterval(async () => {
-  try {
-    const stat = await fsp.stat(vitalsPath);
-    if (stat.mtimeMs !== lastVitalsMtime) {
-      lastVitalsMtime = stat.mtimeMs;
-      const v = await readVitals(REPO_ROOT);
-      if (v) broadcast("vitals", v);
-    }
-  } catch {
-    // vitals not written yet
-  }
-}, 500);
+// Start watchers for initial repo root
+startWatchers();
 
 // Heartbeat so proxies don't close SSE connections.
 setInterval(() => {

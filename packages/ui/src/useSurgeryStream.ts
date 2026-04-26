@@ -24,6 +24,14 @@ export function useSurgeryStream(): StreamState {
     esRef.current = es;
 
     es.addEventListener("hello", () => setConnected(true));
+    es.addEventListener("repo-switched", () => {
+      // Directory switched: clear old state
+      // Fresh vitals will arrive automatically via the existing SSE connection
+      setVitals(null);
+      setEvents([]);
+      setPlanReady(false);
+      setSeamsReady(false);
+    });
     es.addEventListener("plan-ready",    () => setPlanReady(true));
     es.addEventListener("plan-removed",  () => setPlanReady(false));
     es.addEventListener("seams-ready",   () => setSeamsReady(true));
