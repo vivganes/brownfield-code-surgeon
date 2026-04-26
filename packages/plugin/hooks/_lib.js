@@ -95,6 +95,7 @@ export function emptyVitals(repoRoot) {
         seamsFound: 0,
         dependenciesBroken: 0,
         artifacts: [],
+        commitPerPhase: true,
     };
 }
 export function appendEvent(repoRoot, event) {

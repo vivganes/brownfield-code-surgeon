@@ -17,6 +17,30 @@ All surfaces read and write the same artifacts and emit the same events.
 
 Shared contracts live in `packages/shared`; the source-of-truth agent prompts live in `packages/core-prompts`.
 
+## Setup
+
+### Environment Variables
+
+Copy `.env.example` to `.env.local` and configure your credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+Then edit `.env.local` with your API keys:
+
+```env
+# Required: Anthropic API key
+SURGERY_ANTHROPIC_API_KEY=sk-your-key-here
+
+# Optional: GitHub token (can also be configured via UI)
+SURGERY_GIT_TOKEN=ghp_...
+
+# Optional: Managed-Agents environment ID (can also be configured via UI)
+ANTHROPIC_AGENT_ENV_ID=env_...
+```
+
+The `.env.local` file is git-ignored and will not be committed.
 
 ## License
 

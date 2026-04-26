@@ -5,7 +5,6 @@ import path from "node:path";
 export interface Secrets {
   githubToken?: string;
   agentEnvId?: string;
-  anthropicApiKey?: string;
 }
 
 export function secretsDir(): string {
@@ -23,8 +22,6 @@ export function readSecrets(): Secrets {
     return {
       githubToken: typeof parsed.githubToken === "string" ? parsed.githubToken : undefined,
       agentEnvId: typeof parsed.agentEnvId === "string" ? parsed.agentEnvId : undefined,
-      anthropicApiKey:
-        typeof parsed.anthropicApiKey === "string" ? parsed.anthropicApiKey : undefined,
     };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
@@ -49,6 +46,19 @@ export function writeSecrets(patch: Partial<Secrets>): void {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Resolves the Anthropic API key from (in order): explicit override,
+ * then SURGERY_ANTHROPIC_API_KEY env var.
+ * Note: We use a separate env var name to avoid conflicts with the SDK.
+ */
+export function resolveAnthropicApiKey(
+  override?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  if (override) return override;
+  return env.SURGERY_ANTHROPIC_API_KEY ?? undefined;
 }
 
 /**

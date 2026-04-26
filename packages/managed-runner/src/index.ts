@@ -9,6 +9,7 @@ export {
   writeSecrets,
   resolveGithubToken,
   resolveAgentEnvId,
+  resolveAnthropicApiKey,
   type Secrets,
 } from "./secrets.js";
 export {

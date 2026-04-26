@@ -334,12 +334,16 @@ html, body, #root {
 /* All text surfaces inside the modal inherit Orbitron */
 .surgery-modal-dialog h3,
 .surgery-modal-dialog label,
-.surgery-modal-dialog select,
 .surgery-modal-dialog button,
 .surgery-modal-dialog .surgery-section-bar,
 .surgery-modal-dialog .mode-card,
 .surgery-modal-dialog .thinking-toggle button {
   font-family: 'Orbitron', ui-sans-serif, sans-serif;
+}
+
+.surgery-modal-dialog select {
+  font-family: 'Share Tech Mono', ui-monospace, monospace !important;
+  letter-spacing: 0.04em;
 }
 /* Inputs & textareas keep a monospace terminal feel */
 .surgery-modal-dialog input,

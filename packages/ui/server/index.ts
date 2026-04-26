@@ -1,8 +1,16 @@
+import { config } from "dotenv";
 import http from "node:http";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { URL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+// Load .env.local from the monorepo root (../../../.env.local relative to this file)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, "../../../.env.local");
+config({ path: envPath });
 import {
   ARTIFACT_PATHS,
   eventsFile,
@@ -24,10 +32,15 @@ import {
   writeSecrets,
   resolveRepoUrl,
   resolveBaseBranch,
+  resolveAnthropicApiKey,
 } from "@brownfield-surgeon/managed-runner";
 import Anthropic from "@anthropic-ai/sdk";
 
 const PORT = Number(process.env.SURGERY_UI_PORT ?? 7777);
+
+// Resolve the Anthropic API key once at startup.
+// Only use it when creating the client for managed environments — don't set env vars.
+const anthropicApiKey = resolveAnthropicApiKey();
 
 // Grep backtick-quoted filenames (anything with a file extension) from markdown,
 // return deduplicated basenames.
@@ -278,15 +291,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
   if (pathname === "/api/managed/environments" && req.method === "GET") {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!anthropicApiKey) {
       json(res, 503, {
         error:
-          "ANTHROPIC_API_KEY not set in the server environment; cannot list environments",
+          "SURGERY_ANTHROPIC_API_KEY not set; cannot list managed environments",
       });
       return;
     }
     try {
-      const client = new Anthropic();
+      const client = new Anthropic({ apiKey: anthropicApiKey });
       const envs: Array<{ id: string; name: string }> = [];
       for await (const e of client.beta.environments.list()) {
         // Filter out archived envs — they cannot accept new sessions.

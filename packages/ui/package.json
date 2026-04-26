@@ -27,15 +27,16 @@
     "@brownfield-surgeon/shared": "*",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
+    "dotenv": "^17.4.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.160.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^9.3.4",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^15.0.6",
     "@testing-library/user-event": "^14.5.2",
-    "@testing-library/dom": "^9.3.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.184.0",

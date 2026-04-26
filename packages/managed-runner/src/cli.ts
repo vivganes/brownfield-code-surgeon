@@ -1,10 +1,18 @@
 #!/usr/bin/env node
+import { config } from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Load .env.local from the monorepo root (../../../.env.local relative to this file)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, "../../../.env.local");
+config({ path: envPath });
 import Anthropic from "@anthropic-ai/sdk";
 import { parseArgs, HELP, defaultScratchBranch } from "./args.js";
 import { resolveRepoUrl, resolveBaseBranch } from "./git-context.js";
-import { resolveGithubToken, resolveAgentEnvId } from "./secrets.js";
+import { resolveGithubToken, resolveAgentEnvId, resolveAnthropicApiKey } from "./secrets.js";
 import { bootstrapFinishSession, type AttachedFile } from "./session.js";
 import { drainSessionStream } from "./runner.js";
 import type { ManagedEvent } from "./sse-translator.js";
@@ -40,6 +48,7 @@ async function main(): Promise<void> {
   const checkoutBranch = args.checkoutBranch ?? baseBranch;
   const githubToken = resolveGithubToken();
   const environmentId = resolveAgentEnvId(args.agentEnvId);
+  const anthropicApiKey = resolveAnthropicApiKey();
   const model = args.model ?? "claude-opus-4-7";
   const attachedFiles = readAttachedFiles(args.repoRoot);
 
@@ -66,6 +75,9 @@ async function main(): Promise<void> {
   console.log(
     `[managed-runner] githubToken=${githubToken ? "(set)" : "(missing)"}`,
   );
+  console.log(
+    `[managed-runner] anthropicApiKey=${anthropicApiKey ? "(set)" : "(missing)"}`,
+  );
 
   if (args.dryRun) {
     console.log("[managed-runner] --dry-run set; exiting before API call.");
@@ -84,8 +96,14 @@ async function main(): Promise<void> {
     );
     process.exit(2);
   }
+  if (!anthropicApiKey) {
+    console.error(
+      "surgery-managed: missing Anthropic API key. Set SURGERY_ANTHROPIC_API_KEY environment variable.",
+    );
+    process.exit(2);
+  }
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey: anthropicApiKey });
   const result = await bootstrapFinishSession({
     client,
     model,

@@ -51,7 +51,9 @@ export function run(opts = {}) {
         artifacts: vitals.artifacts ?? [],
         summary: `Phase "${phase}" completed. Review artifacts and approve to continue.`,
     });
-    commit(repoRoot, phase, updated.runId);
+    if (vitals.commitPerPhase !== false) {
+        commit(repoRoot, phase, updated.runId);
+    }
     return { stdout: "", exitCode: 0 };
 }
 async function main() {

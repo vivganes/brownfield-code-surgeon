@@ -22,6 +22,8 @@ export default defineConfig({
         "**/dist/**",
         "**/node_modules/**",
         "packages/*/src/build/**",
+        "packages/ui/src/theatre/*.{ts,tsx}", //ignore three.js related files which can only be tested in toy-test
+        "packages/**/cli.ts", //ignore cli files because they need to spawn an actual cli process
       ],
     },
   },

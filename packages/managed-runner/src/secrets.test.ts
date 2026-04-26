@@ -7,6 +7,7 @@ import {
   writeSecrets,
   resolveGithubToken,
   resolveAgentEnvId,
+  resolveAnthropicApiKey,
 } from "./secrets.js";
 
 describe("secrets file", () => {
@@ -110,5 +111,23 @@ describe("resolveAgentEnvId", () => {
     expect(
       resolveAgentEnvId(undefined, { ANTHROPIC_AGENT_ENV_ID: "env_env" }),
     ).toBe("env_file");
+  });
+});
+
+describe("resolveAnthropicApiKey", () => {
+  it("prefers explicit override over env", () => {
+    expect(
+      resolveAnthropicApiKey("sk-arg", { SURGERY_ANTHROPIC_API_KEY: "sk-env" }),
+    ).toBe("sk-arg");
+  });
+
+  it("falls back to SURGERY_ANTHROPIC_API_KEY env var", () => {
+    expect(
+      resolveAnthropicApiKey(undefined, { SURGERY_ANTHROPIC_API_KEY: "sk-key" }),
+    ).toBe("sk-key");
+  });
+
+  it("returns undefined when no source has a value", () => {
+    expect(resolveAnthropicApiKey(undefined, {})).toBeUndefined();
   });
 });
