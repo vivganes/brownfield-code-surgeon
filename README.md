@@ -53,6 +53,18 @@ ANTHROPIC_AGENT_ENV_ID=env_...
 
 The `.env.local` file is git-ignored and will not be committed.
 
+## What if I want to experience the UI without actually running a code surgery?
+
+There is a toy-test mode.  This sets up a toy repo for you and simulates running all the phases.  This could be the best way to experience the system in under 2-3 seconds.
+
+Run the following commands:
+
+```
+npm install
+cd packages/ui
+npm install
+npm run toy-test:auto-approve
+```
 
 ## Evidence of Effectiveness of this Workflow
 
